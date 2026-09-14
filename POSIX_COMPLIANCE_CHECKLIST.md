@@ -1,7 +1,7 @@
 # POSIX compliance checklist
 
 Tracks what stands between OxideBSD today and a genuinely POSIX.1-2017 (Issue 7)-conformant
-system — broader scope than `docs/MISSING_POSIX_SYSCALLS.md`, which only tracks the syscall
+system — broader scope than `MISSING_POSIX_SYSCALLS.md`, which only tracks the syscall
 surface. This doc covers everything else certifiable conformance actually depends on: whole
 subsystems the syscall doc marks "structurally inapplicable," the Shell & Utilities volume,
 locale/timezone data, and the test suite that would actually prove any of it.
@@ -23,7 +23,7 @@ Two different things get called "POSIX compliance," and they have very different
 So "certifiable" here means: pass a real, independent POSIX conformance test suite (see
 "Verification" at the bottom) against genuine technical conformance — not the trademark.
 
-## Already conformant (recap — see `docs/MISSING_POSIX_SYSCALLS.md` for the syscall-level detail)
+## Already conformant (recap — see `MISSING_POSIX_SYSCALLS.md` for the syscall-level detail)
 
 Process control (`fork`/`execve`/`wait4`/`exit`/signals incl. `sigtimedwait`/`sigqueue`), file I/O
 (`open`/`read`/`write`/`lseek`/`stat` family/`access`/hard+symlinks), directories (`getdents`,
@@ -222,7 +222,7 @@ more mechanical work if a real test run says they matter:
 - `sched_policy`/`sched_priority` — stored/echoed via the `sched_*` family, no real scheduling
   effect (single-core, cooperative round-robin only).
 - `sched_yield(2)` — not registered at all; has no real meaning without preemption to yield *to*,
-  per `docs/MISSING_POSIX_SYSCALLS.md`'s own note — but a conformance suite may still expect a
+  per `MISSING_POSIX_SYSCALLS.md`'s own note — but a conformance suite may still expect a
   successful no-op rather than `ENOSYS`.
 - Real per-process CPU-time accounting — `times(2)`/`getrusage(2)` report honest all-zero `struct
   tms`/`struct rusage` rather than fabricated numbers; a conformance suite checking that CPU time
@@ -234,7 +234,7 @@ more mechanical work if a real test run says they matter:
 
 ## Locale, timezone, and the Shell & Utilities volume
 
-Out of `docs/MISSING_POSIX_SYSCALLS.md`'s scope entirely (pure userspace/libc, no syscall
+Out of `MISSING_POSIX_SYSCALLS.md`'s scope entirely (pure userspace/libc, no syscall
 involved) but very much in POSIX.1-2017's scope as a whole:
 
 - [ ] **Real locale data beyond `C`/`POSIX`**: musl itself supports locales, but nothing in this
@@ -258,7 +258,7 @@ involved) but very much in POSIX.1-2017's scope as a whole:
 
 ## Remaining syscall-level items
 
-Tracked in full in `docs/MISSING_POSIX_SYSCALLS.md` — not duplicated here. As of the 28-syscall
+Tracked in full in `MISSING_POSIX_SYSCALLS.md` — not duplicated here. As of the 28-syscall
 pre-reserved batch landing (see memory: all 28 items done), that doc's own "Missing, live caller
 confirmed" table is empty and "Missing, POSIX-mandated, no live caller yet" is down to items
 already covered by the architecture blockers above (`mq_*`'s row there is stale — mq_open through

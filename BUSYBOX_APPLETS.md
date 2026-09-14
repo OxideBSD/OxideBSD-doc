@@ -260,7 +260,7 @@ Builds, but is specific to an init-system/service-supervisor framework this kern
 
 ## Removed before v0.1: 58 applets
 
-All 58 of these still build cleanly (unchanged in `docs/BUSYBOX_APPLETS.md`'s own build-probe
+All 58 of these still build cleanly (unchanged in `BUSYBOX_APPLETS.md`'s own build-probe
 history above), but were deliberately dropped from `build.rs`'s `BUSYBOX_APPLETS_PASS2` and
 `modules/oxfs`'s seed list before v0.1 -- not "not yet working," but structurally incapable of
 working under this kernel's current, deliberate architectural choices (no VT/console/serial/

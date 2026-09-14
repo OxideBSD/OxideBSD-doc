@@ -627,7 +627,7 @@ elsewhere.
 | `timer_create`, `timer_settime`, `timer_gettime`, `timer_getoverrun`, `timer_delete` | POSIX per-process timers | `531-535`, all now implemented — see "Pre-reserved batch: second implementation" above. Distinct from `setitimer`/`getitimer` (`ITIMER_REAL` only), which were already implemented separately. Still no live caller in the current BusyBox/TinyCC/hush roster, but a real handler exists for any future one and the Open POSIX Test Suite pilot exercises them directly. |
 | `select`, `pselect` | fd readiness | `poll(2)` already exists and covers every confirmed live caller (musl's DNS resolver). `src/select/poll.c` doesn't route through `pselect6` on this build (confirmed: `SYS_poll` is used directly). The only BusyBox callers of raw `select` (`inetd`, `telnetd`, `dhcprelay`, `fdisk`, ...) are already cut from the roster. Not part of the pre-reservation batch below — genuinely not needed. |
 | `posix_spawn`, `posix_spawnp` + the `posix_spawnattr_*`/`posix_spawn_file_actions_*` family | process creation | musl implements `posix_spawn` entirely in userspace on top of `vfork`/`execve` (`src/process/posix_spawn.c`) — both of those already exist here (see CLAUDE.md's `vfork.s` note). Not a missing syscall at all, just unexercised library code. |
-| `fexecve` | `execveat`-style exec by fd | musl's `fexecve` falls back to `/proc/self/fd/<n>` + `execve` when `execveat` is unavailable — would work today given real per-fd `/proc` entries exist, modulo the "not a real symlink" limitation already documented in `docs/BUSYBOX_APPLETS.md`'s `NEEDS_PROC` section. |
+| `fexecve` | `execveat`-style exec by fd | musl's `fexecve` falls back to `/proc/self/fd/<n>` + `execve` when `execveat` is unavailable — would work today given real per-fd `/proc` entries exist, modulo the "not a real symlink" limitation already documented in `BUSYBOX_APPLETS.md`'s `NEEDS_PROC` section. |
 
 ## Structurally inapplicable to this kernel's current architecture
 
@@ -741,7 +741,7 @@ so shm ended up genuinely last, matching this table's own prediction after all).
 
 `sysinfo(2)` isn't a POSIX interface at all (Linux-specific), but it's the confirmed live blocker
 for `free`/`uptime`'s primary numbers (`procps/{free,uptime}.c`) per prior research and
-`docs/BUSYBOX_APPLETS.md`'s own `NEEDS_PROC` section. Pre-reserved at `527` (see "Pre-reserved
+`BUSYBOX_APPLETS.md`'s own `NEEDS_PROC` section. Pre-reserved at `527` (see "Pre-reserved
 ahead of implementation" above) — previously sat at its real, unclaimed Linux number `99`. Tracked
 here for completeness since it'll come up in the same implementation pass as several POSIX entries
 above, not because it belongs in a POSIX-conformance doc on its own merits.

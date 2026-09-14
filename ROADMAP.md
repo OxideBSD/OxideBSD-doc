@@ -192,7 +192,7 @@ raised and set aside: not a real dependency of GCC/Clang bring-up (unrelated sub
 possible future nice-to-have, not currently sequenced into this list.
 
 **Real text editors: `nano` and real `vim`** — BusyBox's roster today only has the small `vi`
-applet (see `docs/BUSYBOX_APPLETS.md`); `nano` and full (non-BusyBox) `vim` are separate ports, for
+applet (see `BUSYBOX_APPLETS.md`); `nano` and full (non-BusyBox) `vim` are separate ports, for
 meaningfully better on-target text editing than the current applet-only story — not yet slotted
 into a specific release above.
 
