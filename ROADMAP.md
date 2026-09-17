@@ -106,15 +106,22 @@ releases — each ships standalone rather than bundling everything into one v0.2
   full-corpus run, `scripts/run_posix_pilot_supervised.sh`): **87.4%** raw pass rate / **92.8%**
   excluding UNTESTED (1474 PASS / 1686 total; 22 FAIL / 39 UNRESOLVED / 14 CRASH / 11 TIMEOUT / 29
   UNSUPPORTED / 97 UNTESTED — `shm_open/23-1.c` needed excluding again, a known, real single-core
-  scheduling-throughput limit, not a new bug). Last real host-side comparison (2026-09-06, not
-  re-run this session): the user's Artix (glibc/Linux) host at **89.5%** / **94.3%**, a ~2-point
-  gap — the closest available proxy, not the actual target. Closing it means triaging the full
-  corpus's own remaining FAIL/UNRESOLVED set, not growing the corpus further — it's already
-  complete. Two clusters ruled out this session as real bugs (see `CLAUDE.md`'s own history and
-  session memory for detail): `sigaction/17-{2,10,20,25,26}.c`'s FAILs were transient host-load
-  timing flakiness (all 5 clean `PASS` in this same fresh run); `aio_suspend`'s 6 and `aio_cancel`'s
-  4 UNRESOLVED are a real oxfs file-size-cap gap and an inherent test-timing race respectively,
-  neither a quick fix. **Full POSIX syscall coverage** (every POSIX-mandated syscall, even where
+  scheduling-throughput limit, not a new bug). **Newer baseline (2026-09-15, no exclusions
+  needed)**: **90.3%** raw / **94.6%** excluding UNTESTED (1523 PASS / 1687 total) — within a point
+  of the target on both axes. A few more fixes have landed since (`mlockall/3-7.c`, the ACPI HPET
+  overlay closing `timer_getoverrun/2-2.c`, a `timer_gettime` precision fix) that haven't yet been
+  folded into an official re-run. Last real host-side comparison (2026-09-06, not re-run since):
+  the user's Artix (glibc/Linux) host at **89.5%** / **94.3%** — OxideBSD has now passed that
+  proxy figure on both axes. Closing the remaining gap to the concrete target means triaging the
+  full corpus's own remaining FAIL/UNRESOLVED set, not growing the corpus further — it's already
+  complete. Several clusters already ruled out as real, accepted (non-kernel) issues rather than
+  bugs to fix — see `CLAUDE.md`'s own history for detail: `sigaction/17-{2,10,20,25,26}.c`'s FAILs
+  were transient host-load timing flakiness; `aio_suspend`'s/`aio_cancel`'s remaining UNRESOLVEDs
+  are a real oxfs file-size-cap gap and an inherent test-timing race respectively; a dozen-plus
+  pthread `CRASH`es are a confirmed real, pre-existing musl 1.2.6 UAF design trait (reproduced
+  against unmodified host musl, not an OxideBSD bug); the last 3 scheduler-shaped hangs
+  (`fork/18-1.c`, `pthread_mutex_init/{1,3}-2.c`) are likewise confirmed real, pre-existing musl
+  bugs, not OxideBSD's. **Full POSIX syscall coverage** (every POSIX-mandated syscall, even where
   this ABI's own number/shape — see `CLAUDE.md`'s Syscall ABI section — diverges from Linux's or
   any real BSD's; not a promise to match Linux/BSD numbering or wire format) falls out of this same
   push, not a separate goal.
@@ -125,21 +132,24 @@ releases — each ships standalone rather than bundling everything into one v0.2
   further into Phase 3's "build itself" goal from the C side first), then retiring `tcc` once both
   GCC and Clang are real, working on-target ports — TinyCC was always the first/easiest target,
   never the intended long-term C compiler. **Deferred into this same "toolchain maturity" release
-  (2026-09-09)**: a real Rust `std` target for OxideBSD userland — motivated by `rustrc` (the
-  user's own from-scratch, OpenRC-inspired init system, `git@github.com:Pomsky2011/RustRC.git`,
-  vendored as a submodule at `rustrc/`), which currently only boots as PID 1 on real `std` targets
-  (Linux/FreeBSD/NetBSD, some via `-Z build-std`/`cargo-zigbuild` for Tier 2/3) and has no path onto
-  OxideBSD without one. Recommended approach (not yet started): link `std` against the existing
-  musl fork rather than a from-scratch syscall backend — most of `std::sys::pal::unix`'s own
-  assumptions (real threads/futex-mutexes/TCP-UDP/fork-exec) already work correctly against it,
-  verified extensively by this same release's own POSIX conformance push. Real work: a new hosted
-  userland target spec (distinct from the kernel's own `panic=abort` one), a `sys::pal` backend for
-  `target_os = "oxidebsd"` (a fork of Rust's own `library/` sources, same vendor-and-patch pattern
-  as `third_party/musl`/`busybox`/`tinycc`), and — the biggest real unknown — a `libc`-crate fork
-  declaring this ABI's own struct layouts/constants (it has zero knowledge of this target today).
-  Defaulting userland `std` to `panic=abort` sidesteps real unwinding entirely, matching `rustrc`'s
-  own existing `Cargo.toml` profile. Scope narrow at first: only what `rustrc` itself needs (process
-  spawn/wait, signals, stdio, basic fs), not full `std` fidelity.
+  (2026-09-09)**: a real Rust `std` target for OxideBSD userland — originally motivated by
+  `rustrc`, an AGPLv3, OpenRC-inspired init system the user was evaluating; **that plan changed on
+  2026-09-14** — `rustrc` was dropped (AGPLv3 conflicts with this project's permissive-licensing
+  direction, and it was "too generic" for OxideBSD's own needs anyway) in favor of a native,
+  from-scratch BSD-style init+rc.d system, matching FreeBSD/NetBSD/OpenBSD's own convention, built
+  directly against this kernel's native ABI rather than through a hosted `std` target. The `std`
+  target work itself is still worth doing here — it unblocks any future real-world Rust crate with
+  a crates.io dependency tree, not just the no-longer-relevant `rustrc` case. Recommended approach
+  (not yet started): link `std` against the existing musl fork rather than a from-scratch syscall
+  backend — most of `std::sys::pal::unix`'s own assumptions (real threads/futex-mutexes/TCP-UDP/
+  fork-exec) already work correctly against it, verified extensively by this same release's own
+  POSIX conformance push. Real work: a new hosted userland target spec (distinct from the kernel's
+  own `panic=abort` one), a `sys::pal` backend for `target_os = "oxidebsd"` (a fork of Rust's own
+  `library/` sources, same vendor-and-patch pattern as `third_party/musl`/`busybox`/`tinycc`), and
+  — the biggest real unknown — a `libc`-crate fork declaring this ABI's own struct layouts/
+  constants (it has zero knowledge of this target today). Defaulting userland `std` to
+  `panic=abort` sidesteps real unwinding entirely. Scope narrow at first: only what a first real
+  consumer needs (process spawn/wait, signals, stdio, basic fs), not full `std` fidelity.
 - **v0.4.0 — a real glibc port**, alongside (not replacing) the existing native-ABI musl port.
 - **v0.5.0 — SMP.** Real multi-core support. A substantial architectural undertaking, not a
   bolt-on: huge parts of this codebase currently lean on "single core" as a real correctness

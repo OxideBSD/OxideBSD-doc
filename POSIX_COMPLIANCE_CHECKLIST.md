@@ -30,8 +30,9 @@ Process control (`fork`/`execve`/`wait4`/`exit`/signals incl. `sigtimedwait`/`si
 real multi-component paths, per-process cwd), permissions (real uid/gid/mode, `chmod`/`chown`),
 sockets (UDP/TCP/raw ICMP, `poll`), time/clocks (`clock_gettime`, `nanosleep`, POSIX per-process
 timers, `setitimer`), all three IPC families (POSIX message queues, SysV message
-queues/semaphores/shared memory — see the memory note this closed out), resource limits/scheduling
-*fields* (`prlimit64`, `nice`, `sched_*` — stored/echoed, not enforced, see below),
+queues/semaphores/shared memory — see the memory note this closed out), resource limits
+(`prlimit64`, `nice` — stored/echoed, not enforced), real `SCHED_FIFO`/`SCHED_RR` priority
+semantics (genuinely enforced, not just stored — real `EPERM` on a non-root priority raise too),
 `getrandom`/`sysinfo`. All backed by real end-to-end `SYSCALL` smoke tests.
 
 ## Foundational architecture blockers
@@ -261,9 +262,8 @@ involved) but very much in POSIX.1-2017's scope as a whole:
 Tracked in full in `MISSING_POSIX_SYSCALLS.md` — not duplicated here. As of the 28-syscall
 pre-reserved batch landing (see memory: all 28 items done), that doc's own "Missing, live caller
 confirmed" table is empty and "Missing, POSIX-mandated, no live caller yet" is down to items
-already covered by the architecture blockers above (`mq_*`'s row there is stale — mq_open through
-mq_getsetattr are actually implemented, see that doc's "third implementation" section — worth a
-follow-up correction pass on that doc, not repeated here) plus `select`/`pselect` (deliberately
+already covered by the architecture blockers above (`mq_*`'s row there already correctly notes
+mq_open through mq_getsetattr are implemented) plus `select`/`pselect` (deliberately
 skipped, `poll` already covers every live caller) and `fexecve`/`posix_spawn` (already work via
 existing primitives, no syscall gap). New syscall numbers should continue from `555` (`SYS_CLONE`,
 the current highest — now with a real handler, `process::lifecycle::do_clone`, see "Real threading"
@@ -284,16 +284,17 @@ self-assessing against this checklist:
       `conformance/interfaces/`, `pthread_*`/`aio_*`/`lio_listio*` included now that real threading
       exists) — see CLAUDE.md's "POSIX pilot: full corpus expansion..." section for the growth
       history (68 → 488 → full corpus) and every real kernel/musl bug each expansion pass found.
-- [x] **A real pass/fail baseline against the full ~1673-file corpus** (2026-09-04, both sides
-      including `pthread_*`/`aio_*`): OxideBSD **82.1%** raw pass rate / **85.6%** excluding
-      UNTESTED, measured against a real apples-to-apples comparison run of the identical suite on
-      the user's own Artix Linux host (glibc, native): **86.7%** / **89.7%** — a ~4-point gap, with
-      most of it coming from UNRESOLVED/UNSUPPORTED (test-setup gaps and genuinely-unimplemented
-      optional features) rather than correctness failures on paths that do run — see CLAUDE.md's
-      "Real zombie address-space frame reclaim..." section for the full per-category table and
-      `scripts/run_posix_pilot_host.sh`/`scripts/run_posix_pilot_supervised.sh` to reproduce either
-      side. The 488-file curated-subset baseline this section previously tracked (420P/10F/2U/8US/
-      45UT/2TO/1CR) is superseded, not current — don't cite it going forward.
-      **Next step**: individually triage the full corpus's own FAIL/UNRESOLVED set (much larger now
-      that threading/AIO are included) rather than growing the file count further — the corpus is
-      now complete.
+- [x] **A real pass/fail baseline against the full ~1687-file corpus.** History: 82.1%/85.6%
+      (2026-09-04) → 87.1%/92.5% (real AIO + oxfs O_RDWR) → 89.8%/94.1% (a real `sys_pwritev2`
+      offset-validation fix closed a post-Limine regression) → **90.3% raw / 94.6% excluding
+      UNTESTED (2026-09-15, 1523 PASS / 1687 total, zero exclusions needed)** — the latest official
+      re-run; see `ROADMAP.md`'s v0.2.0 entry for what's landed since and hasn't yet been folded
+      into a fresh number. Last apples-to-apples host comparison (2026-09-06, not re-run since):
+      the user's Artix Linux host (glibc, native) at 89.5%/94.3% — OxideBSD now exceeds that proxy
+      figure on both axes. Full detail and per-category tables live in CLAUDE.md's own session
+      history (search "full-corpus"); `scripts/run_posix_pilot_host.sh`/
+      `scripts/run_posix_pilot_supervised.sh` reproduce either side.
+      **Next step**: individually triage the full corpus's own remaining FAIL/UNRESOLVED set rather
+      than growing the file count further — the corpus is complete, and most of what's left is
+      already confirmed to be real, pre-existing musl 1.2.6 bugs (verified against unmodified host
+      musl) rather than OxideBSD-side gaps.
