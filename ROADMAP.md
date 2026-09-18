@@ -139,17 +139,30 @@ releases — each ships standalone rather than bundling everything into one v0.2
   from-scratch BSD-style init+rc.d system, matching FreeBSD/NetBSD/OpenBSD's own convention, built
   directly against this kernel's native ABI rather than through a hosted `std` target. The `std`
   target work itself is still worth doing here — it unblocks any future real-world Rust crate with
-  a crates.io dependency tree, not just the no-longer-relevant `rustrc` case. Recommended approach
-  (not yet started): link `std` against the existing musl fork rather than a from-scratch syscall
-  backend — most of `std::sys::pal::unix`'s own assumptions (real threads/futex-mutexes/TCP-UDP/
-  fork-exec) already work correctly against it, verified extensively by this same release's own
-  POSIX conformance push. Real work: a new hosted userland target spec (distinct from the kernel's
-  own `panic=abort` one), a `sys::pal` backend for `target_os = "oxidebsd"` (a fork of Rust's own
-  `library/` sources, same vendor-and-patch pattern as `third_party/musl`/`busybox`/`tinycc`), and
-  — the biggest real unknown — a `libc`-crate fork declaring this ABI's own struct layouts/
-  constants (it has zero knowledge of this target today). Defaulting userland `std` to
-  `panic=abort` sidesteps real unwinding entirely. Scope narrow at first: only what a first real
-  consumer needs (process spawn/wait, signals, stdio, basic fs), not full `std` fidelity.
+  a crates.io dependency tree, not just the no-longer-relevant `rustrc` case. **Underway as of
+  2026-09-17**, and landing faster than expected: the recommended approach below turned out right
+  — `std` links against the existing musl fork rather than a from-scratch syscall backend, and
+  almost none of `std::sys::pal::unix` needed a new backend at all. A private `rust-lang/rust` fork
+  (`OxideBSD/rust-oxidebsd`, `oxidebsd` branch) plus a private `libc` crate fork
+  (`OxideBSD/libc-crate-oxidebsd`, `oxidebsd` branch, patched in via `library/Cargo.toml`'s
+  `[patch.crates-io]`) add `target_os = "oxidebsd"` throughout std's own existing
+  `linux`/musl-shaped cfg gates — a real, genuine target identity (confirmed via
+  `std::env::consts::OS`), not borrowed Linux identity. `library/std/build.rs`'s
+  supported-platform allowlist now lists `oxidebsd` too, so consumer binaries need no
+  `#![feature(restricted_std)]` — a real Tier-3-shaped target, not one std merely tolerates.
+  Verified end to end via two real `fork`+`execve`+`wait4`-driven boot tests
+  (`tests/std_hello_oxidebsd_syscall_smoke.rs`, `tests/std_process_fs_oxidebsd_syscall_smoke.rs`):
+  real `println!`/`process::exit`, and real `std::fs` (write/read_to_string/remove_file) +
+  `std::process::Command` (its own internal fork+execve+waitpid, spawning `/bin/true`/`/bin/echo`).
+  Two more real std platform-allowlist gaps found and fixed the same way as `restricted_std` along
+  the way — `sys/pipe/unix.rs`'s `pipe2` list and `sys/fd/unix.rs`'s `set_cloexec` list both
+  defaulted to a fallback (`pipe()`+`ioctl(FIOCLEX)`) that doesn't work here (`ioctl(2)` only
+  handles `TCGETS`/`TCSETS*`/`TIOCGWINSZ`/`TIOCSWINSZ` against the real console); fixed by routing
+  `oxidebsd` into the same real `pipe2(O_CLOEXEC)`/`fcntl(F_SETFD, FD_CLOEXEC)` paths `linux`
+  already uses (both genuinely supported by this kernel's own `pipe2(2)`/`fcntl(2)`). Real work
+  still ahead: `std::net`/threads/signals haven't been exercised through `std` yet (only fs/process
+  so far), and this is still a hand-maintained pair of private forks, not anything upstreamable —
+  no `panic=unwind` support attempted, `panic=abort` only.
 - **v0.4.0 — a real glibc port**, alongside (not replacing) the existing native-ABI musl port.
 - **v0.5.0 — SMP.** Real multi-core support. A substantial architectural undertaking, not a
   bolt-on: huge parts of this codebase currently lean on "single core" as a real correctness
