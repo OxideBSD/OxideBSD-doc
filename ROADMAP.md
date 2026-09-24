@@ -159,11 +159,27 @@ releases — each ships standalone rather than bundling everything into one v0.2
   defaulted to a fallback (`pipe()`+`ioctl(FIOCLEX)`) that doesn't work here (`ioctl(2)` only
   handles `TCGETS`/`TCSETS*`/`TIOCGWINSZ`/`TIOCSWINSZ` against the real console); fixed by routing
   `oxidebsd` into the same real `pipe2(O_CLOEXEC)`/`fcntl(F_SETFD, FD_CLOEXEC)` paths `linux`
-  already uses (both genuinely supported by this kernel's own `pipe2(2)`/`fcntl(2)`). Real work
-  still ahead: `std::net`/threads/signals haven't been exercised through `std` yet (only fs/process
-  so far), and this is still a hand-maintained pair of private forks, not anything upstreamable —
-  no `panic=unwind` support attempted, `panic=abort` only.
+  already uses (both genuinely supported by this kernel's own `pipe2(2)`/`fcntl(2)`). Threads,
+  signals and `std::net` socket plumbing have since been exercised through `std` too
+  (`std-thread-net-signal-oxidebsd`). Still a hand-maintained pair of private forks, not anything
+  upstreamable; `panic=abort` only.
+
+  **v0.3.0 scope, decided 2026-09-23:** (1) **GCC** as a real on-target port (not started);
+  (2) **finish `std`** -- the whole surface a `/bin` utility needs, verified by a std coverage
+  consumer, **static-PIE** std binaries (musl's self-relocating `rcrt1` + the kernel's existing
+  random-bias loader), and the 12 native `bin/` utilities **rewritten as std apps**; (3) a native
+  **init system** -- `/sbin/init` as a Rust std app, FreeBSD/NetBSD-style `/etc/rc` + `rc.d` +
+  `rcorder` + `rc.conf`, replacing `hush` as pid 1. Clang *rebuilding itself* on-target is **not**
+  v0.3.0: it needs Python (LLVM's CMake) and CMake, which move later. Landed toward it already: the
+  C++ stage (libc++, on-target `clang++`), the whole `*at()` family, `ppoll(2)`, demand-grown user
+  stacks, and ninja on-target (see `CLAUDE.md`). Placement of every binary: `HIER.md`.
 - **v0.4.0 — a real glibc port**, alongside (not replacing) the existing native-ABI musl port.
+  **Decided 2026-09-23:** a *full* glibc port (a `sysdeps/` port to OxideBSD's native ABI), for
+  **source** compatibility with glibc-only software -- chosen over an Alpine-style compatibility
+  layer on musl. Needs v0.3.0's GCC, and Python (glibc's build uses it). Also in v0.4.0: a batch of
+  userland work, and **oxlibc pulled forward** from v0.7.0 -- grown from scratch in `lib/oxlibc`
+  until `std` on `x86_64-unknown-oxidebsd` can run on it instead of musl, with no change to the
+  std-based utilities.
 - **v0.5.0 — SMP.** Real multi-core support. A substantial architectural undertaking, not a
   bolt-on: huge parts of this codebase currently lean on "single core" as a real correctness
   argument, not just a performance ceiling — `IA32_SFMASK` clearing `IF` for a syscall's entire
@@ -185,7 +201,8 @@ releases — each ships standalone rather than bundling everything into one v0.2
 - **v0.7.0 — `oxlibc`.** OxideBSD's own from-scratch native libc (BSD-3-Clause licensed — a
   deliberate licensing choice, not a fork of `relibc` or anything else with different terms),
   standing alongside the existing vendored musl/glibc ports rather than replacing them outright.
-  Long-term/deferred until this point in the sequence; not started.
+  Long-term/deferred until this point in the sequence; not started. **Partly pulled into v0.4.0
+  (2026-09-23)** -- see there.
 - **v0.8.0 — the graphical update: more advanced graphics.** Builds directly on real
   groundwork already landed ahead of this release: a real `/dev/fb0` character device
   (`process::mm::do_mmap_fb` maps the actual framebuffer's physical MMIO frames into a userland
