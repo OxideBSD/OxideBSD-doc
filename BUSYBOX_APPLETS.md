@@ -18,6 +18,14 @@ does, and is exactly what CLAUDE.md's "BusyBox gap analysis" tracks.
 `more`, `mkdir`, `rmdir`, `rm`, `mv`, `cp`, `touch`, `head`, `tail`, `wc`, `basename`, `dirname`,
 `printf`, `seq`, `cut`, `sort`, `uniq`, `kill`) and aren't re-listed here.
 
+## Second cut, 2026-09-23: 48 more removed, the rest out of `/bin`
+
+48 applets were removed from the roster (listed in `HIER.md`'s "Removed 2026-09-23"), and the
+tuples for the 12 native `bin/` utilities and BusyBox `vi` went with them. 195 BusyBox applets
+remain, placed per `HIER.md` across `/bin`, `/sbin`, `/usr/bin` and `/usr/sbin`. BusyBox `sh`
+(hush) is `/bin/hush`; `/bin/sh` is OxideBSD's own shell. The categories below predate this cut
+and still list the removed names.
+
 ## Build succeeded: 287 applets (229 kept in the roster -- see "Removed before v0.1" below)
 
 **Pre-v0.1 roster cleanup**: 58 of these 287 built cleanly but their core function structurally
