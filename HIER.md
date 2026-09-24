@@ -30,8 +30,8 @@ Deliberate deviations from FreeBSD, each so single-user repair has what it actua
 | `/usr/tests` | Test programs (FreeBSD's convention) -- not on anyone's `PATH` |
 | `/usr/local/bin`, `/usr/local/sbin` | Third-party software installed later (ports/packages), never base |
 
-Default `PATH`: root gets `/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin`; users get
-`/bin:/usr/bin:/usr/local/bin`.
+Default `PATH`: root gets `/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/games`; users get
+`/bin:/usr/bin:/usr/local/bin:/usr/games` (`/usr/games` last, as on OpenBSD).
 
 ## Init system placement
 
