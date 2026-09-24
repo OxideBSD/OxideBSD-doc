@@ -22,6 +22,8 @@ deliberately depart from them.
 |---|---|
 | `/sbin/init` | Process 1. A Rust `std` program. |
 | `/sbin/rcorder` | Orders `rc.d` scripts by their dependency headers. A Rust `std` program. |
+| `/sbin/init_sh` | Interpreter for `/etc/rc`, `rc.shutdown` and `rc.d` scripts (see `INIT_SH.md`). |
+| `/sbin/initconf` | Controls and configures services: `initconf <action> <service>` (see `INIT_SH.md` §4.4). |
 | `/etc/rc` | Boot script, run by init in the `runcom` state. |
 | `/etc/rc.shutdown` | Shutdown script, run by init before terminating processes. |
 | `/etc/rc.subr` | Shell functions shared by every `rc.d` script. |
