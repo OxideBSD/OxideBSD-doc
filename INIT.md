@@ -26,8 +26,8 @@ deliberately depart from them.
 | `/sbin/initconf` | Controls and configures services: `initconf <action> <service>` (see `INIT_SH.md` §4.4). |
 | `/etc/rc` | Boot script, run by init in the `runcom` state. |
 | `/etc/rc.shutdown` | Shutdown script, run by init before terminating processes. |
-| `/etc/rc.subr` | Shell functions shared by every `rc.d` script. |
-| `/etc/rc.d/<service>` | One `sh` script per service. |
+| `/etc/rc.subr` | Kept for compatibility; its functions are `init_sh` built-ins (`INIT_SH.md` §4.7). |
+| `/etc/rc.d/<service>` | One `init_sh` script per service (`INIT_SH.md` §4.1). |
 | `/etc/defaults/rc.conf` | Default settings. MUST NOT be edited locally. |
 | `/etc/rc.conf` | Local settings. Overrides `/etc/defaults/rc.conf`. |
 | `/etc/ttys` | Terminals on which init runs login sessions. |
@@ -60,7 +60,7 @@ be passed to init as arguments: `-s` requests the `single-user` state.
 for its children explicitly, including at least `PATH`, `HOME`, `SHELL` and `TERM`. The default
 `PATH` for root is `/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin`.
 
-4.3. Without `-s`, init enters `runcom` and runs `/bin/sh /etc/rc autoboot`.
+4.3. Without `-s`, init enters `runcom` and runs `/sbin/init_sh /etc/rc autoboot`.
 
 4.4. `/etc/rc` MUST load `/etc/defaults/rc.conf` and then `/etc/rc.conf`, obtain the service order
 from `rcorder /etc/rc.d/*`, and run each script with the argument `start`.
@@ -72,7 +72,9 @@ anything.
 on the console and MUST continue with the remaining scripts. Only a failure of `/etc/rc` itself
 (a non-zero exit) causes init to enter `single-user`.
 
-4.7. Each `rc.d` script MUST declare its dependencies in comment headers that `rcorder` reads:
+4.7. Each `rc.d` script MUST declare its dependencies for `rcorder`, either with the `provide`,
+`require`, `before` and `keyword` fields of a service block (`INIT_SH.md` §4.2) or, for classic
+FreeBSD-style scripts, with comment headers:
 
 ```
 # PROVIDE: cron
