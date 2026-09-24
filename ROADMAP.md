@@ -173,6 +173,12 @@ releases — each ships standalone rather than bundling everything into one v0.2
   v0.3.0: it needs Python (LLVM's CMake) and CMake, which move later. Landed toward it already: the
   C++ stage (libc++, on-target `clang++`), the whole `*at()` family, `ppoll(2)`, demand-grown user
   stacks, and ninja on-target (see `CLAUDE.md`). Placement of every binary: `HIER.md`.
+
+  **Added 2026-09-24:** (4) **a cleanup phase** -- OxideBSD should *act like a regular OS* rather
+  than take shortcuts; every known shortcut and its target is inventoried in `CLEANUP.md`;
+  (5) **`sudo` via sudo-rs**, with the kernel credentials, `/dev/tty`, pseudo-terminals and
+  OpenPAM it needs (`SUDO.md`); sudo-rs's `su` replaces BusyBox's. Since then pid 1 is OxideBSD's
+  own interactive `/bin/sh` (`lib/libsh`), not hush -- `/sbin/init` (item 3) replaces it next.
 - **v0.4.0 — a real glibc port**, alongside (not replacing) the existing native-ABI musl port.
   **Decided 2026-09-23:** a *full* glibc port (a `sysdeps/` port to OxideBSD's native ABI), for
   **source** compatibility with glibc-only software -- chosen over an Alpine-style compatibility
