@@ -1,6 +1,6 @@
 # OxideBSD init_sh: design specification
 
-Status: **draft for review.** Sections marked *(proposal)* are open to change. Target release:
+Status: **accepted (reviewed 2026-09-23).** Items marked *(proposal)* were accepted as written. Target release:
 v0.3.0. Companion to `INIT.md`.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -111,12 +111,36 @@ loaded.
 
 A non-zero exit from `start_pre` MUST abort the start.
 
-### 4.4. Actions
+### 4.4. Actions and initconf
 
-A service script is run as `init_sh <script> <action>`. Standard actions: `start`, `stop`,
-`restart`, `status`, `enable`, `disable`, `rcvar`, plus any defined with `command <name>`. The
-prefixes `force` (ignore `<name>_enable`), `one` (run once even if disabled) and `quiet` apply as
-in FreeBSD's `rc.subr`.
+4.4.1. Services are controlled and configured with `/sbin/initconf`, a separate program:
+
+```
+initconf <action> <script>
+initconf list
+```
+
+`<script>` is a service name, looked up as `/etc/rc.d/<script>` and then
+`/usr/local/etc/rc.d/<script>`; an argument containing `/` is used as a path.
+
+4.4.2. **Runtime actions**: `start`, `stop`, `restart`, `status`, and any defined with
+`command <name>` (§4.3). The prefixes `force` (ignore `<name>_enable`), `one` (run once even if
+disabled) and `quiet` apply as in FreeBSD's `rc.subr`, e.g. `initconf onestart cron`. `initconf`
+performs a runtime action by running the script with `init_sh`.
+
+4.4.3. **Configuration actions**, performed by `initconf` itself on `/etc/rc.conf`:
+
+| Action | Effect |
+|---|---|
+| `enable` / `disable` | Set `<name>_enable` to `YES` / `NO` |
+| `rcvar` | Print the service's `rc.conf` variables and their current values |
+| `list` (no script) | Print every service with its enabled state |
+
+4.4.4. A service script MAY also be run directly, `/etc/rc.d/<name> <action>`, for runtime
+actions; its `#!/sbin/init_sh` line makes this equivalent to `initconf <action> <name>`.
+
+4.4.5. The argument order (action first) differs deliberately from FreeBSD's `service(8)`
+(`service cron start`).
 
 ### 4.5. Enabling and restarts
 
@@ -155,7 +179,10 @@ accepted and has no effect.
 ## 5. /etc/rc
 
 `/etc/rc` is itself an `init_sh` program. It loads `rc.conf`, obtains the order from `rcorder`,
-and runs `start` on each service, reporting failures and continuing (`INIT.md` §4.6).
+and runs `start` on each service, reporting failures and continuing (`INIT.md` §4.6). It runs
+services **in-process** through the core's service machinery, not by invoking `initconf` for each
+one; `/etc/rc.shutdown` does the same with `stop`. The behavior of an action MUST be identical by
+either path.
 
 ## 6. rcorder
 
