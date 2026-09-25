@@ -15,23 +15,20 @@ removed from this list when its fix lands, with the commit noted in the history 
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| `AT_RANDOM` is the fixed 16 bytes `OxideBSDNotRealX` for every process (`sys/process/user_stack.rs`), so musl's stack-protector canary and `arc4random` seed are predictable. A real generator (`sys/random.rs`) has existed for a while. | 16 fresh random bytes per `execve` | v0.3.0 |
 | One uid and one gid per process; no real/effective/saved split; supplementary groups not stored (`getgroups` returns the caller's gid); setuid/setgid bits ignored at `execve`. | POSIX credentials; setuid executables | v0.3.0 (`SUDO.md` §5.1) |
 | Syscalls dereference user pointers without validating them (`sys_read`/`sys_write` and others); a bad pointer faults instead of returning `EFAULT`. | `copyin`/`copyout` with `EFAULT` | v0.3.0 |
-| `reboot(2)` has no permission check. | Root only | v0.3.0 |
 | No `NO_EXECUTE` on any page, no W^X; module pages all writable; ELF segments sharing a page don't union their flags. | NX stacks and data, read-only text | later |
 | Kernel stacks have no guard page; an overflow silently corrupts memory. | Guard pages | v0.3.0 |
+| TCP initial sequence numbers are the tick counter XOR a counter (`sys/net/tcp.rs` `isn()`), so they are predictable. | Random per RFC 6528 | v0.3.0 |
 
 ## 2. Processes and signals
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | pid 1 is a shell (`/bin/sh`, before that hush); no init, no `/etc/rc`, no getty/login at boot. | `/sbin/init` | v0.3.0 (`INIT.md`) |
-| `kill(-1, sig)` signals pid 1's process group. | Every process the caller may signal, except itself and init | v0.3.0 |
 | An orphan reparented to pid 1 is detached immediately (pid 1 has no reaping loop). | init reaps orphans | v0.3.0 (with init) |
 | `setrlimit` limits are stored, never enforced. | Enforced | v0.3.0 (the ones that matter: `NOFILE`, `STACK`, `AS`, `CORE`) |
 | `nice`/`setpriority` stored, no effect on scheduling. | Affects scheduling | later |
-| `umask` stored, never applied when oxfs creates a file. | Applied to every create | v0.3.0 |
 | `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` system time stale. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 | Fork copies the whole address space eagerly. | Copy-on-write | later |
@@ -44,7 +41,7 @@ removed from this list when its fix lands, with the commit noted in the history 
 | oxfs's open-file table is system-wide and fixed-size. | Per-process tables with `RLIMIT_NOFILE` | v0.3.0 |
 | `unlink`/`rmdir` never free blocks or inodes; tmpfs space is never reclaimed. | Freed on last link and last close | v0.3.0 |
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
-| Renaming a directory to a new parent doesn't update its `..`. | Updated | v0.3.0 |
+| `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing. | `EXDEV` across filesystems | v0.3.0 |
 | No FIFOs (`mkfifo` was removed from the roster). | Named pipes | v0.3.0 |
 | Only four device nodes do anything (`/dev/random`, `urandom`, `null`, `zero`). No `/dev/tty`, `/dev/console`, ptys. | Real character devices | v0.3.0 (`SUDO.md` §5.2) |
 | `/proc` is a special case inside oxfs; no VFS layer. | A VFS with filesystems mounted on it | later |
@@ -67,10 +64,9 @@ removed from this list when its fix lands, with the commit noted in the history 
 |---|---|---|
 | The guest's IP address and gateway are compiled in; no `ifconfig`, no DHCP client. | Configured at boot (`rc.conf`) | v0.3.0 (`INIT.md`: `ifconfig_*`) |
 | One routing rule (off-subnet goes to the gateway). | A routing table | later |
+| Incoming packets are only processed when a process calls into the network stack (the NIC is polled, not interrupt-driven), so `poll`/`select` on a socket must keep running instead of blocking, and can't also see keystrokes in the same call. | Interrupt-driven receive | v0.3.0 |
 | TCP is stop-and-wait with a fixed 536-byte segment size, no window or congestion control. | Real TCP | later |
-| `poll` reports only `POLLIN`. | All events | v0.3.0 |
 | No loopback interface; no named or datagram `AF_UNIX` sockets (so no `/dev/log`, no syslog). | Both | v0.3.0 (syslog needs them, `INIT.md`) |
-| Several errno values are FreeBSD's where musl expects Linux's (`ENOTSOCK`, `EDESTADDRREQ`, `EADDRINUSE`, `EHOSTUNREACH`, TCP's set, and oxfs's `ENOTEMPTY`). | Match the C library | v0.3.0 |
 | No IPv6. | IPv6 | later |
 
 ## 6. Userland and build
@@ -81,9 +77,18 @@ removed from this list when its fix lands, with the commit noted in the history 
 | BusyBox applets are 195 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | User programs link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 (static-PIE `std` binaries) |
 | No `dlopen`; `mprotect` enforcement limited to the `mmap` window. | Both | later |
-| Rust `std` calls Linux syscall 318 (`getrandom`), unregistered here, and falls back. | Served | v0.3.0 |
+| The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
 | `/etc/passwd` and `/etc/group` can't be changed by any tool (`adduser`, `passwd`...). | They can | v0.3.0 |
 
 ## 7. History
 
 Record removed shortcuts here as `date — item — commit`.
+
+- 2026-09-24 — `AT_RANDOM` is 16 fresh random bytes per `execve` — f97971a (branch `cleanup-easy-shortcuts`)
+- 2026-09-24 — `reboot(2)` is root-only — f97971a
+- 2026-09-24 — `kill(-1, sig)` signals every permitted process except init and the caller — f97971a
+- 2026-09-24 — `umask` applied by `mkdir` and `mknod` (`open` already did); `mkdir` also honours its mode, records its owner and checks parent permission, and `rmdir`/`rename` check permission — f97971a
+- 2026-09-24 — `rename` of a directory rewrites `..`, refuses to move into its own subtree, and may replace an empty directory — f97971a
+- 2026-09-24 — `poll`/`select` report real `POLLIN`/`POLLOUT`/`POLLHUP`/`POLLERR`, block for pipes and the console, and fail `EINTR` — f97971a
+- 2026-09-24 — every errno constant matches musl's — f97971a
+- 2026-09-24 — Rust `std`'s `getrandom` reaches `SYS_GETRANDOM` (libc fork, `SYS_getrandom = 526`) — f97971a
