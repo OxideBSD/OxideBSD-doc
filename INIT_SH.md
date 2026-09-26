@@ -163,6 +163,8 @@ ignored.
 
 ### 4.7. rc.subr built-ins
 
+*Implemented (b212178).* Service blocks parse (§4.1–4.3) but cannot run yet.
+
 These are native built-ins, so that scripts written for FreeBSD's `rc.subr` run unchanged:
 `load_rc_config`, `run_rc_command`, `checkyesno`, `check_pidfile`, `check_process`,
 `wait_for_pids`, `force_depend`, `info`, `warn`, `err`, `debug`. `. /etc/rc.subr` MUST be
