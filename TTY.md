@@ -4,7 +4,8 @@ Status: **draft for review.** Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in `tty(4)`, `termios(4)`, `console(4)` and `uart(4)`; this
-document records the design. Pseudo-terminals build on it and are specified in `PTY.md`.
+document records the design. Where the BSDs agree it follows them; where they differ, the
+majority. Pseudo-terminals build on it and are specified in `PTY.md`.
 
 ## 1. Scope
 
@@ -23,10 +24,19 @@ state MUST NOT be shared between them.
 | Device | Terminal | Input | Output |
 |---|---|---|---|
 | `/dev/ttyv0` | the framebuffer console | PS/2 and USB keyboards | the ANSI engine and framebuffer (`sys/console/vga.rs`) |
-| `/dev/ttyu1` | the second serial port (COM2, I/O 0x2F8, IRQ 3) | UART receive interrupts | UART transmit |
+| `/dev/tty01` | the second serial port (COM2, I/O 0x2F8, IRQ 3) | UART receive interrupts | UART transmit |
 
-2.3. **`/dev/console`** is the system console: opening it opens the terminal that is currently
-the console, `ttyv0`. Kernel messages go to the console.
+2.3. **`/dev/console`** is the system console, a device of its own in every BSD: output written to
+it, and kernel messages, go to the terminal that is currently the console (`ttyv0`), or to the
+terminal that took it over with `TIOCCONS`; input read from it comes from `ttyv0`.
+
+2.3.1. `TIOCCONS` on a terminal descriptor redirects console output to that terminal, as in all
+three BSDs; only root may take the console from another terminal, and it reverts when that
+terminal closes.
+
+2.3.2. The kernel keeps its messages in a message buffer, as every BSD does, in addition to printing
+them on the console. `/dev/klog` reads it, for `syslogd` and `dmesg`; `dmesg` moves to
+`sysctl kern.msgbuf` once `sysctl(3)` exists.
 
 2.4. **`/dev/tty`** opens the calling process's controlling terminal, or fails with `ENXIO` if it
 has none.
@@ -34,11 +44,12 @@ has none.
 2.5. **COM1** is not a terminal. It carries the kernel's messages and a copy of everything written
 to `ttyv0`, as it does today, because tests read their results from it.
 
-**Rationale.** FreeBSD names the first serial port `ttyu0` and would give COM1 to it. Keeping COM1
-as the log and test channel, and putting the login line on COM2, avoids moving every test.
+**Rationale.** NetBSD and OpenBSD name the serial ports `tty00`, `tty01`...; FreeBSD's `ttyu0` is
+the exception. Keeping COM1 (`tty00`) as the log and test channel, and putting the login line on
+COM2, avoids moving every test. There is no `/dev/tty00` node while COM1 serves this purpose.
 
 2.6. Device numbers (`st_rdev`): `ttyv<n>` is major 4, minor n; `/dev/tty` is (5, 0);
-`/dev/console` is (5, 1); `ttyu<n>` is major 6, minor n. oxfs seeds the nodes; opening one opens
+`/dev/console` is (5, 1); `tty0<n>` (serial port *n*) is major 6, minor n. oxfs seeds the nodes; opening one opens
 the kernel terminal, not an oxfs file.
 
 2.7. More virtual terminals (`ttyv1`… switched with Alt+F*n*) MAY be added later; the design does
@@ -69,7 +80,8 @@ input unless `NOFLSH`. The characters come from `c_cc`, not fixed values.
 3.7. **Output processing** (`c_oflag`): `OPOST`, `ONLCR`, `OCRNL`, `ONOCR`, `ONLRET`, `OXTABS`
 (tab expansion). Output is bytes: the UTF-8 check on console writes is removed.
 
-3.8. The default `termios` MUST be FreeBSD's `TTYDEF_*` values: `ICRNL|IXON|IXANY|IMAXBEL|BRKINT`,
+3.8. The default `termios` MUST be 4.4BSD's `TTYDEF_*` values (`<sys/ttydefaults.h>`), which all
+three BSDs share: `ICRNL|IXON|IXANY|IMAXBEL|BRKINT`,
 `OPOST|ONLCR`, `CREAD|CS8|HUPCL`, `ICANON|ISIG|IEXTEN|ECHO|ECHOE|ECHOKE|ECHOCTL`, the standard
 control characters, 9600 baud for serial lines.
 
@@ -90,7 +102,8 @@ mode that means a complete line or end-of-file is pending.
 
 ## 5. Controlling terminals and job control
 
-5.1. A session leader acquires a controlling terminal only with `TIOCSCTTY`, as in FreeBSD; opening
+5.1. A session leader acquires a controlling terminal only with `TIOCSCTTY`, as in all three
+BSDs; opening
 a terminal never does it implicitly, and `O_NOCTTY` is accepted and has no effect. `TIOCSCTTY`
 fails if the terminal is another session's, unless the caller is root and passes a non-zero
 argument.
@@ -146,11 +159,11 @@ polled.
 DTR on last close; `CLOCAL` ignores carrier.
 
 8.3. Under QEMU, COM2 is attached with a second `-serial` option (for example a host pty), so a
-host terminal emulator or a test can use `ttyu1`.
+host terminal emulator or a test can use `tty01`.
 
 ## 9. Verification
 
-9.1. On-target tests through `ttyu1`, driven from the host: canonical line editing and `^D`,
+9.1. On-target tests through `tty01`, driven from the host: canonical line editing and `^D`,
 `VMIN`/`VTIME`, echo flags, `^C` and `^Z` from `c_cc`, `SIGTTIN`/`SIGTTOU`, hang-up on session
 leader exit, `SIGWINCH`, `ttyname`, and `poll`.
 
@@ -158,6 +171,4 @@ leader exit, `SIGWINCH`, `ttyname`, and `poll`.
 
 ## 10. Open questions
 
-1. Whether `/dev/console` should become a separate device that can be redirected (`TIOCCONS`),
-   as in FreeBSD, rather than an alias.
-2. A kernel message buffer (`dmesg`) separate from the console.
+1. The message buffer's size, and whether it survives a warm reboot as FreeBSD's does.
