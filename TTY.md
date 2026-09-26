@@ -103,10 +103,10 @@ mode that means a complete line or end-of-file is pending.
 ## 5. Controlling terminals and job control
 
 5.1. A session leader acquires a controlling terminal only with `TIOCSCTTY`, as in all three
-BSDs; opening
-a terminal never does it implicitly, and `O_NOCTTY` is accepted and has no effect. `TIOCSCTTY`
-fails if the terminal is another session's, unless the caller is root and passes a non-zero
-argument.
+BSDs; opening a terminal never does it implicitly, and `O_NOCTTY` is accepted and has no effect.
+`TIOCSCTTY` fails with `EPERM` if the terminal is another session's; no BSD offers a way to take
+it. `TIOCNOTTY` from a session leader fails with `EINVAL`, as in NetBSD and OpenBSD; the leader
+gives up the terminal by exiting (§5.4).
 
 5.2. `TIOCSPGRP` and `tcsetpgrp` MUST accept only a process group in the terminal's session.
 
