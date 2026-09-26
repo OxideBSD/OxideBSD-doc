@@ -30,8 +30,6 @@ removed from this list when its fix lands, with the commit noted in the history 
 | `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` system time stale. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 | Fork copies the whole address space eagerly. | Copy-on-write | later |
-| No `SIGPIPE`: writing to a pipe, FIFO or socket with no reader fails `EPIPE` but raises no signal. | `SIGPIPE`, then `EPIPE` if it's ignored | v0.3.0 |
-| A process killed while blocked in a FIFO `open()` leaves its reader/writer count behind (`sys/fs/pipe.rs`), so a later non-blocking open can wrongly see a peer. | Counts dropped when the process dies | v0.3.0 |
 
 ## 3. Files and descriptors
 
@@ -94,3 +92,5 @@ Record removed shortcuts here as `date — item — commit`.
 - 2026-09-25 — FIFOs: `mkfifo`/`mknod(S_IFIFO)` and blocking named-pipe `open()` — 124974b
 - 2026-09-25 — TCP initial sequence numbers per RFC 6528 — 124974b
 - 2026-09-25 — kernel stacks have guard pages (`memory::kstack`) — 124974b
+- 2026-09-25 — a write that fails `EPIPE` raises `SIGPIPE` — a10bb36
+- 2026-09-25 — a process killed while blocked in a FIFO `open()` gives back its reader/writer count — a10bb36
