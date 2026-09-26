@@ -1,6 +1,6 @@
 # OxideBSD terminals: design specification
 
-Status: **draft for review.** Target release: v0.3.0.
+Status: **accepted design, partly implemented** (see §10). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in `tty(4)`, `termios(4)`, `console(4)` and `uart(4)`; this
@@ -169,6 +169,92 @@ leader exit, `SIGWINCH`, `ttyname`, and `poll`.
 
 9.2. The existing interactive tests (`sendkey` into `ttyv0`) MUST keep passing.
 
-## 10. Open questions
+## 10. Implementation status
+
+As of OxideBSD `8deb5e2`. The work is split into five slices.
+
+### 10.1. Done: the terminal core (slice 1)
+
+| Item | Section | Where |
+|---|---|---|
+| Per-terminal state; `ttyv0` driving the console, its output copied to COM1 before output processing | 2.1, 2.2, 2.5 | `sys/tty/mod.rs`, `sys/tty/console.rs` |
+| Canonical mode, `VMIN`/`VTIME`, echo flags, input and output processing, flow control | 3 | `sys/tty/mod.rs` |
+| Signal characters from `c_cc`; 4.4BSD default `termios` | 3.6, 3.8 | `sys/tty/mod.rs` |
+| Blocking reads and writes, `EAGAIN`, `EINTR`; `poll`/`select` readiness | 4 | `sys/tty/mod.rs`, `sys/net/mod.rs` |
+| System call restart (`ERESTART`, `SA_RESTART`) | 4.1 | `sys/syscall/mod.rs`, `sys/process/signals.rs` |
+| `TIOCSCTTY`/`TIOCNOTTY` rules, `TIOCSPGRP` limited to the session | 5.1, 5.2 | `sys/tty/mod.rs` |
+| `SIGTTIN`/`SIGTTOU`, defaulting to Stop | 5.3 | `sys/tty/mod.rs`, `sys/process/mod.rs` |
+| Hang-up when a session leader exits | 5.4 | `sys/process/lifecycle.rs` |
+| `SIGWINCH` on a window-size change | 5.5 | `sys/tty/mod.rs` |
+| Terminal `ioctl`s, `ENOTTY` elsewhere | 5.6 | `sys/syscall/ffi.rs` |
+| fds 0-2 of the first process are one read-write description of `ttyv0` | 6.1 | `sys/fs/fd.rs` |
+| The screen's owner (`/dev/fb0`) takes the keyboard, except the signal characters | 7.2 | `sys/tty/console.rs` |
+| Cursor-position replies go to `ttyv0`'s input | 7.3 | `sys/console/vga.rs` |
+
+Verified: `session_syscall_smoke` (the BSD controlling-terminal rules), plus
+`basic_boot`, `poll`, `ppoll`, `sh`, `sig`, `fd`, `keyevent`, `init_respawn` and
+`rc` passing on the new layer. A live boot driven through QEMU's `sendkey`
+confirmed line editing, `^D` end-of-file, `^C` (status 130), and `^Z` with
+`jobs` and `kill %1`.
+
+The same slice fixed a scheduler re-entrancy bug: an interrupt that landed in
+the scheduler's idle loop called `schedule()` again, which halted the system
+with a process marked Running. Interrupt handlers now reschedule only when they
+interrupted user code.
+
+### 10.2. To do
+
+**Slice 2: devices and descriptors.**
+1. Device nodes `/dev/ttyv0` (4, 0), `/dev/tty` (5, 0) and `/dev/console` (5, 1),
+   seeded by oxfs. Opening one opens the kernel terminal through a new kernel
+   export, the same way FIFOs do (`oxidebsd_fifo_open`).
+2. `/dev/tty` resolves to the caller's controlling terminal, or fails with
+   `ENXIO`.
+3. `fstat` on a terminal descriptor reports its device node's `st_dev`,
+   `st_ino` and `st_rdev` (§6.2). This replaces oxfs's `real_fd <= 2` console
+   special case.
+4. `/proc/self`, and `readlink("/proc/<pid>/fd/<n>")`, return a terminal's
+   device path, so that musl's `ttyname(3)` works (§6.3).
+5. `/proc/<pid>/stat` reports the real session, `tty_nr` and `tpgid` (§6.4).
+   Today its session field reports the process group.
+6. `/etc/ttys` lists `ttyv0` instead of `console`.
+
+**Slice 3: remaining job control.**
+1. Blocked readers woken by a caught signal (`EINTR`/restart) for every
+   blocking path, not only terminals: `signal_foreground_group`'s SetPending
+   path doesn't wake a terminal reader today.
+2. Orphaned process groups: `SIGTTIN` gives `EIO` instead of stopping (POSIX).
+
+**Slice 4: the serial line (§8).**
+1. A 16550 driver for COM2 (0x2F8, IRQ 3), with receive interrupts and a
+   transmit queue, registered as terminal `tty01` (6, 1), with node
+   `/dev/tty01`.
+2. `c_cflag` programs speed, character size, parity and stop bits; `HUPCL` and
+   `CLOCAL`.
+3. `scripts/qemu_common.sh` attaches COM2 to a host pty, on request.
+4. `/etc/ttys`: `tty01` as `onifexists`.
+
+**Slice 5: the console device and the message buffer (§2.3).**
+1. `/dev/console` as its own device: output goes to the console terminal, or
+   to the terminal that took it with `TIOCCONS`; input comes from `ttyv0`.
+2. A kernel message buffer holding every kernel message, readable through
+   `/dev/klog`.
+
+**Tests (§9).**
+1. On-target tests through `tty01`, driven from a host pty: line editing,
+   `VMIN`/`VTIME`, echo flags, signal characters, job control, hang-up,
+   `ttyname`, `poll`.
+2. A `sendkey`-driven console test, since no current test types into the
+   console, and the idle-loop bug in §10.1 needs a keyboard interrupt that
+   arrives while nothing is runnable.
+
+**Known limitations.**
+1. Output is written synchronously, so `TCSETSW` does not wait for anything,
+   and `TIOCOUTQ` reports 0.
+2. `IUCLC`/`OLCUC` (upper-case terminals) are not implemented.
+3. `O_NOCTTY` is accepted and ignored, which is correct because opening a
+   terminal never acquires it.
+
+## 11. Open questions
 
 1. The message buffer's size, and whether it survives a warm reboot as FreeBSD's does.
