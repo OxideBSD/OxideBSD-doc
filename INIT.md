@@ -187,8 +187,8 @@ The design depends on the following kernel behavior, some of which does not exis
 
 | Requirement | Section | Status |
 |---|---|---|
-| `kill(-1, sig)` signals every process except process 1 and the caller | 10.3 | Not implemented (currently signals process 1's process group) |
-| Boot flags passed to init as arguments | 4.1 | Not implemented |
+| `kill(-1, sig)` signals every process except process 1 and the caller | 10.3 | Done (f97971a) |
+| Boot flags passed to init as arguments | 4.1 | Done in the kernel (27dbcb1): `-s` on the kernel command line gives `/sbin/init -s`, as FreeBSD/OpenBSD's `start_init()` do; used once `/sbin/init` is process 1 |
 | Signal protection for process 1 | 9.1 | Not implemented |
 | Respawn, reparenting and repeated-failure shell | 9.2, 9.4 | Not implemented (process 1 exiting currently leaves the system idle) |
 | Interface configuration ioctls | `rc.d/netif` | Not implemented |
