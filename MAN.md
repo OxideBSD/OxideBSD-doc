@@ -1,6 +1,6 @@
 # OxideBSD manual pages: oxdoc, man and apropos — design specification
 
-Status: **accepted design, not yet implemented.** Target release: v0.3.0.
+Status: **accepted design, partly implemented** (see §13). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces will be documented in the manual pages `oxdoc(1)`, `man(1)`, `apropos(1)`,
@@ -204,3 +204,15 @@ its parser, in the same step.
    specifies `more` and not `less`.
 2. `apropos` searches full text, unlike mandoc's (§7.3).
 3. Each language reference is written alongside its parser (§11).
+
+## 13. Implementation status
+
+| Step (§11) | Status |
+|---|---|
+| 1. roff core, `mdoc`, terminal device, `oxdoc`, `man`, `more`; `roff(7)`, `mdoc(7)` | Done. Every OxideBSD page matches mandoc byte for byte; 82% of 827 third-party mdoc pages do |
+| 2. `man` language and lint | In progress: 47% of a 1500-page man(7) sample matches mandoc; `man(7)` reference and lint not yet written |
+| 3. `tbl` | Not started |
+| 4. Index, `makewhatis`, `apropos`, `whatis` | Not started |
+| 5. `eqn`, HTML, Markdown | Not started |
+
+Known, intended differences from mandoc 1.14.6: `.MR` (groff 1.23) is implemented.
