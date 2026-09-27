@@ -171,7 +171,7 @@ leader exit, `SIGWINCH`, `ttyname`, and `poll`.
 
 ## 10. Implementation status
 
-As of OxideBSD `8deb5e2`. The work is split into five slices.
+As of OxideBSD `fde98f6`. The work is split into five slices.
 
 ### 10.1. Done: the terminal core (slice 1)
 
@@ -202,22 +202,22 @@ the scheduler's idle loop called `schedule()` again, which halted the system
 with a process marked Running. Interrupt handlers now reschedule only when they
 interrupted user code.
 
-### 10.2. To do
+### 10.2. Done: devices and descriptors (slice 2)
 
-**Slice 2: devices and descriptors.**
-1. Device nodes `/dev/ttyv0` (4, 0), `/dev/tty` (5, 0) and `/dev/console` (5, 1),
-   seeded by oxfs. Opening one opens the kernel terminal through a new kernel
-   export, the same way FIFOs do (`oxidebsd_fifo_open`).
-2. `/dev/tty` resolves to the caller's controlling terminal, or fails with
-   `ENXIO`.
-3. `fstat` on a terminal descriptor reports its device node's `st_dev`,
-   `st_ino` and `st_rdev` (§6.2). This replaces oxfs's `real_fd <= 2` console
-   special case.
-4. `/proc/self`, and `readlink("/proc/<pid>/fd/<n>")`, return a terminal's
-   device path, so that musl's `ttyname(3)` works (§6.3).
-5. `/proc/<pid>/stat` reports the real session, `tty_nr` and `tpgid` (§6.4).
-   Today its session field reports the process group.
-6. `/etc/ttys` lists `ttyv0` instead of `console`.
+| Item | Section | Where |
+|---|---|---|
+| Nodes `/dev/ttyv0` (4, 0, root:tty 0600), `/dev/tty` (5, 0, 0666), `/dev/console` (5, 1, 0600); group `tty` (4) | 2.6 | `sys/modules/oxfs` |
+| Opening a terminal node opens the kernel terminal (`oxidebsd_tty_open`), honoring the access mode and `O_NONBLOCK`; no such terminal is `ENXIO` | 2.6 | `sys/tty/mod.rs` |
+| `/dev/tty` opens the caller's controlling terminal, or fails with `ENXIO` | 2.4 | `sys/tty/mod.rs` |
+| `fstat` on a terminal descriptor reports its node's `st_dev`, `st_ino`, `st_rdev`; pipes and sockets report `S_IFIFO`/`S_IFSOCK` | 6.2 | `sys/modules/oxfs` (`stat_real_fd`) |
+| `/proc/self`; `/proc/<pid>/fd/<n>` are symlinks: a terminal's node, a file's path (` (deleted)` once unlinked, following renames), `pipe:[N]`, `socket:[N]`, `anon_inode:[mqueue]` | 6.3 | `sys/modules/oxfs`, `sys/fs/fd.rs` (`FdKind`) |
+| `/proc/<pid>/stat` reports the session, `tty_nr` and `tpgid` | 6.4 | `sys/process/procfs.rs` |
+| `/etc/ttys` runs getty on `ttyv0`; `console` stays, `off`, for its `secure` flag | — | `etc/ttys` |
+
+Verified: `tty_syscall_smoke` (`regress/tty-smoke/main.c`: the nodes, musl's `ttyname(3)`, `/dev/tty`
+with and without a controlling terminal, the `/proc` links and fields).
+
+### 10.3. To do
 
 **Slice 3: remaining job control.**
 1. Blocked readers woken by a caught signal (`EINTR`/restart) for every
@@ -249,10 +249,14 @@ interrupted user code.
    arrives while nothing is runnable.
 
 **Known limitations.**
-1. Output is written synchronously, so `TCSETSW` does not wait for anything,
+1. `/dev/console` opens `ttyv0` until slice 5 makes it a device of its own.
+2. `F_GETFL` doesn't report a descriptor's access mode (a general `fcntl` gap, not terminals').
+3. `open("/proc/<pid>/fd/<n>")` doesn't reopen the descriptor; only `readlink` and `stat` follow
+   the link.
+4. Output is written synchronously, so `TCSETSW` does not wait for anything,
    and `TIOCOUTQ` reports 0.
-2. `IUCLC`/`OLCUC` (upper-case terminals) are not implemented.
-3. `O_NOCTTY` is accepted and ignored, which is correct because opening a
+5. `IUCLC`/`OLCUC` (upper-case terminals) are not implemented.
+6. `O_NOCTTY` is accepted and ignored, which is correct because opening a
    terminal never acquires it.
 
 ## 11. Open questions
