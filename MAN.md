@@ -213,7 +213,7 @@ its parser, in the same step.
 | 1. roff core, `mdoc`, terminal device, `oxdoc`, `man`, `more`; `roff(7)`, `mdoc(7)` | Done. Every OxideBSD page matches mandoc byte for byte; 83% of 827 third-party mdoc pages do |
 | 2. `man` language and lint | Done: 94% of a 1500-page man(7) sample matches mandoc; `man(7)` reference written; `-T lint` matches mandoc's diagnostics on 80% of the man(7) sample and 92% of the mdoc one (Xr lookups need step 4) |
 | 3. `tbl` | Done: 102 of the samples' 106 pages with tables match mandoc; tbl diagnostics in lint; `tbl(7)` reference written |
-| 4. Index, `makewhatis`, `apropos`, `whatis` | In progress: `makewhatis`, `apropos`, `whatis` and `man`'s lookup by any page name written; queries over a 2300-page sample match mandoc's apart from the differences below; the system's index is built with the image |
+| 4. Index, `makewhatis`, `apropos`, `whatis` | Done: `makewhatis`, `apropos`, `whatis` (with full text, `-t`) and `man`'s lookup by any page name; queries over a 2300-page sample match mandoc's apart from the differences below; the system's index is built with the image; `apropos(1)`, `makewhatis(8)` written |
 | 5. `eqn`, HTML, Markdown | Not started |
 
 Known, intended differences from mandoc 1.14.6: `.MR` (groff 1.23) is implemented; `.TQ` follows
