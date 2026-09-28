@@ -210,7 +210,7 @@ its parser, in the same step.
 | Step (§11) | Status |
 |---|---|
 | 1. roff core, `mdoc`, terminal device, `oxdoc`, `man`, `more`; `roff(7)`, `mdoc(7)` | Done. Every OxideBSD page matches mandoc byte for byte; 82% of 827 third-party mdoc pages do |
-| 2. `man` language and lint | In progress: 47% of a 1500-page man(7) sample matches mandoc; `man(7)` reference and lint not yet written |
+| 2. `man` language and lint | In progress: 88% of a 1500-page man(7) sample matches mandoc (94% of the pages without tbl or eqn); `man(7)` reference written; lint not yet written |
 | 3. `tbl` | Not started |
 | 4. Index, `makewhatis`, `apropos`, `whatis` | Not started |
 | 5. `eqn`, HTML, Markdown | Not started |
