@@ -66,6 +66,11 @@ pre {
 
 img { max-width: 100%; height: auto; }
 
+/* Screenshots side by side, one above the other on a narrow screen. */
+.shots { display: flex; flex-wrap: wrap; gap: 0.5em; }
+.shots a { flex: 1 1 18em; min-width: 0; }
+.shots img { display: block; }
+
 .date { color: var(--dim); }
 
 ul.news { list-style: none; padding: 0; }
