@@ -17,7 +17,8 @@ Layout:
 	pages/NAME.html		a page, at /NAME.html
 	news/YYYY-MM-DD-slug.html
 				a news post; listed on /news/ and in /news/atom.xml
-	images/			copied as it is
+	images/			copied as it is: the logo and icons (favicon.ico sits
+				next to this file, since browsers ask for it at the root)
 	template/		the header and footer around every page
 	style.css
 	CNAME			the domain, for GitHub Pages
@@ -28,3 +29,8 @@ A page or post is an HTML fragment whose first line is its title:
 	<p>...</p>
 
 A "<!-- WRITE: ... -->" comment marks text still to be written; it doesn't show on the site.
+
+The logo's lettering is black, which disappears in dark mode. A variant for it goes in
+images/logo-dark.png, and template/head.html then picks it with
+	<picture><source srcset="@ROOT@images/logo-dark.png" media="(prefers-color-scheme: dark)">
+around the logo's img.

@@ -40,7 +40,8 @@ header {
 	padding-bottom: 0.5em;
 	margin-bottom: 1em;
 }
-header .site { font-weight: bold; margin-right: 1em; }
+header .site { margin-right: 1em; }
+header .site img { vertical-align: middle; }
 header nav { display: inline; }
 header nav a { margin-right: 0.75em; }
 

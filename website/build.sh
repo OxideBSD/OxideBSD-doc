@@ -23,6 +23,7 @@ for src in "$here"/pages/*.html; do
 done
 cp "$here/style.css" "$out/style.css"
 [ -f "$here/CNAME" ] && cp "$here/CNAME" "$out/CNAME"
+[ -f "$here/favicon.ico" ] && cp "$here/favicon.ico" "$out/favicon.ico"
 [ -d "$here/images" ] && cp -R "$here/images" "$out/"
 
 # News posts, newest first.
