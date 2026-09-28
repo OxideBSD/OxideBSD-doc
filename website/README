@@ -29,8 +29,3 @@ A page or post is an HTML fragment whose first line is its title:
 	<p>...</p>
 
 A "<!-- WRITE: ... -->" comment marks text still to be written; it doesn't show on the site.
-
-The logo's lettering is black, which disappears in dark mode. A variant for it goes in
-images/logo-dark.png, and template/head.html then picks it with
-	<picture><source srcset="@ROOT@images/logo-dark.png" media="(prefers-color-scheme: dark)">
-around the logo's img.
