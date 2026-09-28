@@ -1,0 +1,30 @@
+oxidebsd.org
+
+Plain HTML and CSS, put together by build.sh and man.sh (POSIX sh) and a Makefile.
+
+	make			build the site into _site/
+	make man OXDOC=... MANDIR=...
+				add the manual pages, rendered with oxdoc(1) from
+				OxideBSD's share/man (OXDOC can be liboxdoc's oxdoc-host)
+	make todo		list text still to be written
+	make clean
+
+.github/workflows/website.yml builds and deploys it to GitHub Pages on a push that changes
+website/, once a day (for manual page changes in OxideBSD), and on demand.
+
+Layout:
+
+	pages/NAME.html		a page, at /NAME.html
+	news/YYYY-MM-DD-slug.html
+				a news post; listed on /news/ and in /news/atom.xml
+	images/			copied as it is
+	template/		the header and footer around every page
+	style.css
+	CNAME			the domain, for GitHub Pages
+
+A page or post is an HTML fragment whose first line is its title:
+
+	<!-- title: What happened -->
+	<p>...</p>
+
+A "<!-- WRITE: ... -->" comment marks text still to be written; it doesn't show on the site.

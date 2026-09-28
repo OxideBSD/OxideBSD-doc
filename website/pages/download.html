@@ -1,0 +1,25 @@
+<!-- title: Download - OxideBSD -->
+<h1>Download</h1>
+
+<!-- WRITE: a sentence or two on what state releases are in (0.x releases are unstable) -->
+
+<p>There are no prebuilt images yet; OxideBSD is built from source and run in QEMU.</p>
+
+<h2>Source</h2>
+<pre>git clone --recurse-submodules https://github.com/OxideBSD/OxideBSD.git</pre>
+<p>Releases are tagged (<a href="https://github.com/OxideBSD/OxideBSD/releases/tag/v0.2.0">v0.2.0</a>
+is the latest); <code>master</code> is where work happens. Design documents are in
+<a href="https://github.com/OxideBSD/OxideBSD-doc">OxideBSD-doc</a>.</p>
+
+<h2>Requirements</h2>
+<ul>
+<li>A C compiler (clang or gcc) with musl support</li>
+<li>GNU make</li>
+<li>Rust nightly (the exact version is pinned in <code>rust-toolchain.toml</code>; rustup picks it up)</li>
+<li>QEMU, and OVMF firmware for UEFI boot</li>
+</ul>
+
+<h2>Build and run</h2>
+<pre>cargo run</pre>
+<p>This builds the kernel and userland, stages a bootable ISO and boots it in QEMU. The first
+build is slow: it builds BusyBox, musl and a Clang/LLVM toolchain from source.</p>

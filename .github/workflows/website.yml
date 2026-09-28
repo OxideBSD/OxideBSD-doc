@@ -1,0 +1,73 @@
+# Builds oxidebsd.org from website/ and deploys it to GitHub Pages. The manual pages are rendered
+# with oxdoc(1), built from OxideBSD's own tree (only lib/liboxdoc and share/man are checked out);
+# the daily run picks up changes to them there.
+
+name: website
+
+on:
+  push:
+    branches: [master]
+    paths: ['website/**', '.github/workflows/website.yml']
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: OxideBSD/OxideBSD
+          path: oxidebsd
+          sparse-checkout: |
+            lib/liboxdoc
+            share/man
+            .cargo
+
+      # The toolchain pinned in rust-toolchain.toml.
+      - name: Rust
+        working-directory: oxidebsd
+        run: rustup toolchain install
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            oxidebsd/lib/liboxdoc/target
+          key: oxdoc-${{ hashFiles('oxidebsd/rust-toolchain.toml', 'oxidebsd/lib/liboxdoc/Cargo.lock') }}
+
+      - name: oxdoc
+        working-directory: oxidebsd/lib/liboxdoc
+        run: cargo build --release --bin oxdoc-host
+
+      - name: Site
+        run: >
+          make -C website site man
+          OXDOC=$GITHUB_WORKSPACE/oxidebsd/lib/liboxdoc/target/x86_64-unknown-linux-gnu/release/oxdoc-host
+          MANDIR=$GITHUB_WORKSPACE/oxidebsd/share/man
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

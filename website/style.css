@@ -1,0 +1,90 @@
+/* oxidebsd.org: one column of plain text. */
+
+:root {
+	color-scheme: light dark;
+	--fg: #111;
+	--bg: #fff;
+	--dim: #666;
+	--rule: #ccc;
+	--link: #0645ad;
+	--visited: #663399;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--fg: #ddd;
+		--bg: #161616;
+		--dim: #999;
+		--rule: #444;
+		--link: #8ab4f8;
+		--visited: #c58af9;
+	}
+}
+
+body {
+	max-width: 46em;
+	margin: 0 auto;
+	padding: 1em;
+	color: var(--fg);
+	background: var(--bg);
+	line-height: 1.45;
+}
+
+a { color: var(--link); }
+a:visited { color: var(--visited); }
+a:not([href]) { color: inherit; }
+header a, header a:visited { color: var(--link); }
+
+header {
+	border-bottom: 1px solid var(--rule);
+	padding-bottom: 0.5em;
+	margin-bottom: 1em;
+}
+header .site { font-weight: bold; margin-right: 1em; }
+header nav { display: inline; }
+header nav a { margin-right: 0.75em; }
+
+footer {
+	border-top: 1px solid var(--rule);
+	margin-top: 2em;
+	color: var(--dim);
+	font-size: 0.9em;
+}
+
+h1 { font-size: 1.4em; }
+h2 { font-size: 1.15em; }
+
+/* (Twice: a lone "monospace" is shrunk by browsers.) */
+code, pre { font-family: monospace, monospace; }
+
+pre {
+	overflow-x: auto;
+	padding: 0.5em;
+	border: 1px solid var(--rule);
+}
+
+img { max-width: 100%; height: auto; }
+
+.date { color: var(--dim); }
+
+ul.news { list-style: none; padding: 0; }
+ul.news li { margin-bottom: 0.3em; }
+
+/* Manual pages, as oxdoc(1) marks them up. */
+
+.manual table.head, .manual table.foot { width: 100%; border-collapse: collapse; }
+.manual .head-vol { text-align: center; }
+.manual .head-rtitle, .manual .foot-os { text-align: right; }
+.manual h1 { font-size: 1.1em; margin: 1.2em 0 0.3em; }
+.manual h2 { font-size: 1em; margin: 1em 0 0.3em; }
+.manual .permalink { color: inherit; text-decoration: none; }
+.manual .Nm, .manual .Fl, .manual .Cm, .manual .Ic, .manual .Fn, .manual .Fd,
+.manual .In, .manual .Cd, .manual .Ms { font-weight: bold; }
+.manual code.Nm, .manual .Fl, .manual .Cm, .manual .Ic, .manual .Fn, .manual .Fd,
+.manual code.In, .manual .Cd { font-family: inherit; }
+.manual .Pa, .manual .Ad { font-style: italic; }
+.manual .Nd, .manual .Op, .manual .Bf { display: inline; }
+.manual .Bl-diag > dt { font-weight: bold; }
+.manual .Bd-indent, .manual dd { margin-left: 2em; }
+.manual table.tbl td { padding: 0 0.5em; }
+.manual pre { border: none; padding: 0; }
