@@ -126,9 +126,10 @@ arguments rebuilds every tree in `man.conf`; `-d dir file ...` updates entries; 
 removes them; `-t` checks the index against the tree.
 
 7.2. **Format.** A single file, read by memory mapping or one read: a header (magic `OXDOCDB`,
-version, offsets), a string table, a page table (file, sections, architectures, names and the
-one-line description from `.Nd` or the `NAME` section), and a key table of `(macro class,
-value, page)` entries sorted for binary search. The macro classes are mandoc's (`Nm`, `Nd`,
+version, offsets), a string table, a page table (file, sections, architecture, names, link
+names and the one-line description from `.Nd` or the `NAME` section), and a key table of
+`(macro class, value)` entries sorted for binary search, each with a list of the pages it
+occurs in (a key is stored once, which keeps the full-text class small). The macro classes are mandoc's (`Nm`, `Nd`,
 `Xr`, `Fn`, `Ev`, `Pa`, `Er`, `Cd`, `In`, `Va`, `Sh`, `Ss`, ...), so `apropos Xr=getty` and
 `apropos -s 8 Nm~^pwd` work as on OpenBSD.
 
@@ -212,8 +213,10 @@ its parser, in the same step.
 | 1. roff core, `mdoc`, terminal device, `oxdoc`, `man`, `more`; `roff(7)`, `mdoc(7)` | Done. Every OxideBSD page matches mandoc byte for byte; 83% of 827 third-party mdoc pages do |
 | 2. `man` language and lint | Done: 94% of a 1500-page man(7) sample matches mandoc; `man(7)` reference written; `-T lint` matches mandoc's diagnostics on 80% of the man(7) sample and 92% of the mdoc one (Xr lookups need step 4) |
 | 3. `tbl` | Done: 102 of the samples' 106 pages with tables match mandoc; tbl diagnostics in lint; `tbl(7)` reference written |
-| 4. Index, `makewhatis`, `apropos`, `whatis` | Not started |
+| 4. Index, `makewhatis`, `apropos`, `whatis` | In progress: `makewhatis`, `apropos`, `whatis` and `man`'s lookup by any page name written; queries over a 2300-page sample match mandoc's apart from the differences below; the system's index is built with the image |
 | 5. `eqn`, HTML, Markdown | Not started |
 
 Known, intended differences from mandoc 1.14.6: `.MR` (groff 1.23) is implemented; `.TQ` follows
-groff (no blank line before it), where mandoc lays it out like `.TP`.
+groff (no blank line before it), where mandoc lays it out like `.TP`; `apropos` lists a page's
+names in its NAME section's order (mandoc's order follows its hash table), stores descriptions
+in UTF-8 (shown in ASCII outside a UTF-8 locale), and indexes full text (`Tx`).
