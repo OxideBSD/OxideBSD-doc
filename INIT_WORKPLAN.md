@@ -83,8 +83,8 @@ Mark `UNIX.md` implemented.
 ## 4. sysctl, message buffer, `/dev/klog`, load average, memory statistics — done
 
 Left over, to do with the next musl change (each one relinks BusyBox, ~40 minutes, so they're
-batched with step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`): `struct loadavg` and `struct
-vmtotal` in `<sys/sysctl.h>`, and `getloadavg(3)` reading `vm.loadavg` (today it reads the same
+batched with step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`): `struct loadavg`, `struct
+vmtotal` and `CTLFLAG_SKIP` in `<sys/sysctl.h>`, and `getloadavg(3)` reading `vm.loadavg` (today it reads the same
 averages through `sysinfo(2)`). Not done: a kernel API for modules to add variables (`SYSCTL.md`
 §3.6 is a MAY; add it when a module has something to export, `vfs.oxfs` first). `/proc/meminfo`
 still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
