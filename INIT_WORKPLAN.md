@@ -6,7 +6,7 @@ decisions already taken, the traps already found, and how each part is verified.
 `UNIX.md`, `SYSCTL.md`, `SYSLOG.md`, `CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md`
 and `TTY.md`; this file doesn't repeat it. Update it as parts land.
 
-Last updated 2026-09-28.
+Last updated 2026-09-29.
 
 ## Done
 
@@ -17,12 +17,13 @@ Last updated 2026-09-28.
 | BSD source layout: `sys/netinet`, rtl8139 in `sys/drivers`, `sys/modules/socket` | `3a7c686` | |
 | Sockets stage 1: socket layer and protocol switch (`sys/kern/uipc_socket.rs`) | `d6f73cd` | UDP, TCP, raw ICMP are `Protocol`s |
 | Sockets stage 2: `sendmsg`/`recvmsg` (577/578), `get/setsockopt` (579/580), `getpeername` (581), `accept4` (582), flags, options, timeouts, blocking socket waits, UDP `connect`, TCP non-blocking `connect`/`shutdown`/`SO_ERROR` | `a73d4a3`, musl `b37feab1` | `regress/socket-smoke`, 64 checks |
+| Sockets stage 3: local sockets (`sys/kern/uipc_usrreq.rs`), oxfs socket inodes, `socketpair` on them | `38bbcb4` | `regress/socket-smoke`, 165 checks; `wget` HTTPS checked by hand |
 
 Next free syscall number: **583** (reserved for `sysctl` by `SYSCTL.md` §4.1); then 584 upward.
 
 ## Order
 
-1. Sockets stage 3: local sockets.
+1. ~~Sockets stage 3: local sockets.~~ Done.
 2. Sockets stage 4: descriptor and credential passing.
 3. Sockets stage 5: manual pages; UNIX.md closed out.
 4. sysctl, the message buffer and `/dev/klog`, load average, memory statistics, tunables.
@@ -36,46 +37,18 @@ Next free syscall number: **583** (reserved for `sysctl` by `SYSCTL.md` §4.1); 
 Steps 4, 7 and 8 don't depend on the socket work and may move earlier. syslogd (5) needs local
 datagram sockets (1). init (10) needs syslog (5) and uses sysctl (4).
 
-## 1. Sockets stage 3: local sockets (`UNIX.md` §§5-7, 10)
+## 1. Sockets stage 3: local sockets — done (`38bbcb4`)
 
-Kernel, `sys/kern/uipc_usrreq.rs`:
+As planned, with these details settled in the code: oxfs registers one pair of callbacks
+(`oxidebsd_register_socket_nodes(create, lookup)`), each `(path_ptr, path_len) -> inode | -errno`;
+the kernel keys sockets by inode number alone (inode numbers are unique across oxfs's pools). No
+`SUPERBLOCK_VERSION` bump: the socket kind is a new code in the existing kind byte. `mknod(2)` with
+`S_IFSOCK` stays `EINVAL`, as in FreeBSD. Stream control-data attachment (§6.4) waits for stage 4:
+the receive queue is already a list of messages, so a message carrying control data will simply
+not be merged into.
 
-- Three `Protocol`s: `SOCK_STREAM`, `SOCK_DGRAM`, `SOCK_SEQPACKET`, all with `pulled() == false`
-  (waiters block and are woken by the other side, through `process::wake_pollers`, as pipes do).
-  Register in `uipc_socket::find_protocol` under `AF_UNIX` (protocol 0 only).
-- Addresses (`sockaddr_un`, 110 bytes): unnamed / path / abstract, told apart as in §5.1.
-  Autobind on `bind` with `addrlen == 2`: a five-hex-digit abstract name.
-- Abstract namespace: a kernel table name → socket, released on close.
-- Path names need oxfs. Modules can call the kernel, not the other way round, so oxfs registers
-  callbacks with the kernel at `module_init` (the same pattern as fd callbacks):
-  - `create_socket_node(path, mode) -> (dev, inode) | errno`: `EADDRINUSE` if the path exists,
-    usual path and permission errors, mode `0777 & ~umask`, owner the caller; relative to the
-    caller's cwd and root.
-  - `lookup_socket_node(path) -> (dev, inode) | errno`: write permission required (`EACCES`),
-    `ENOTSOCK` for another file type.
-
-  The kernel keeps `(dev, inode) → socket`; a node with no entry (stale, or from a previous boot)
-  gives `ECONNREFUSED`. oxfs gains `InodeKind::Socket` (persisted: bump `SUPERBLOCK_VERSION` only
-  if the on-disk inode layout changes), `stat` reports `S_IFSOCK`, `open` fails `EOPNOTSUPP`,
-  `unlink`/`rename` work as for any file.
-- Connections: listen queue `min(backlog, 128)`, `connect` completes at once into the queue,
-  `ECONNREFUSED` when full; queued connections reset (`ECONNRESET`) when the listener closes.
-- Buffers: one per direction, sized by the receiver's `SO_RCVBUF` (the layer's `Options`; re-add
-  an accessor, removed from stage 2 as unused); streams keep control data attached to its bytes;
-  sequenced packets keep boundaries (`Received::eor`, truncation sets `full > n`); datagrams:
-  `EMSGSIZE` over `SO_SNDBUF`, `ENOBUFS` when the receiver's queue is full, `connect` sets a
-  default destination without filtering, `ENOTCONN` once it's gone.
-- `shutdown`, EOF, `EPIPE` (the layer raises `SIGPIPE`), `POLLHUP`.
-- `socketpair(AF_UNIX, any type)`: move onto these protocols; delete `SOCK_ENDS` and
-  `do_socketpair`/`do_shutdown` from `sys/fs/pipe.rs`; other domains `EOPNOTSUPP`. Already in
-  place: `fstat` gives `S_IFSOCK`, `/proc/<pid>/fd/<n>` reads `socket:[N]`.
-
-Verification: extend `regress/socket-smoke/main.c` with local-socket sections (fork for the peer
-side): naming kinds and lengths, permissions, stale nodes, each type's semantics, `MSG_PEEK`,
-`MSG_WAITALL`, `MSG_TRUNC`, `SIGPIPE`/`MSG_NOSIGNAL`/`SO_NOSIGPIPE`, shutdown both ways, backlog
-full, listener close. The data-path features of stage 2 (peek, truncation, waitall) are first
-testable here, since there is no loopback interface. Then the full regression set (below), with
-BusyBox `wget` over HTTPS checked by hand or via `sendkey`: it uses `socketpair`.
+A disk image formatted before stage 2's musl change still holds BusyBox binaries that call the
+retired syscall 142; delete `target/oxfs_disk.img` to reseed.
 
 ## 2. Sockets stage 4: descriptors and credentials (`UNIX.md` §§8-9)
 
