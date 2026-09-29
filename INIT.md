@@ -216,7 +216,8 @@ The design depends on the following kernel behavior, some of which does not exis
 | `sethostname(2)` (`rc.d/hostname`) | 12 | Done (b212178): `SYS_SETHOSTNAME` = 576 |
 | `/dev/console` | 13 | Not implemented |
 | Interface configuration ioctls | `rc.d/netif` | Not implemented |
-| Named `AF_UNIX` datagram sockets (`/dev/log`) | `rc.d/syslogd` | Not implemented |
+| Named `AF_UNIX` datagram sockets (`/dev/log`) | `rc.d/syslogd` | Specified in `UNIX.md` |
+| Kernel message buffer, `/dev/klog`, `sysctl(3)` | `rc.d/syslogd`, `rc.d/sysctl` | Specified in `SYSLOG.md`, `SYSCTL.md` |
 
 Implemented in userland: `/sbin/rcorder` (with FreeBSD's `-k`, `-s`, `-p` and `-g`), `/etc/rc`,
 `/etc/rc.shutdown`, the `rc.subr` built-ins (INIT_SH.md §4.7), `reboot`/`halt`/`poweroff`,
@@ -226,9 +227,9 @@ blocks.
 ## 12. Initial services
 
 The first release ships these `rc.d` scripts: `hostname`, `tmp` (a `tmpfs` on `/tmp`), `cleanvar`
-(empties `/var/run`), `sysctl`, `cron`, `netif`, `syslogd`, and the placeholders `FILESYSTEMS`,
-`NETWORKING`, `SERVERS`, `DAEMON` and `LOGIN`. `netif` and `syslogd` require the kernel features
-listed in §11.
+(empties `/var/run`), `sysctl` (`SYSCTL.md`), `cron` (`CRON.md`), `netif`, `syslogd` and
+`newsyslog` (`SYSLOG.md`), and the placeholders `FILESYSTEMS`, `NETWORKING`, `SERVERS`, `DAEMON`
+and `LOGIN`. `netif`, `syslogd` and `sysctl` require the kernel features listed in §11.
 
 12.1. `tmpmfs` defaults to `AUTO`, as in FreeBSD: a `tmpfs` is mounted on `/tmp` only if `/tmp` is
 not writable. **Rationale:** the `tmpfs` pool is small (4 MiB), and compilers write their
@@ -237,7 +238,9 @@ temporary files to `/tmp`.
 ## 13. Open questions
 
 1. Getty restart rate limit (§5.3): the exact threshold and delay.
-2. Where init records messages before `syslogd` is running.
+2. ~~Where init records messages before `syslogd` is running.~~ Resolved (`SYSLOG.md` §5): init
+   opens its log with `LOG_CONS`, so its messages reach `/dev/console` until `syslogd` starts;
+   kernel messages wait in the message buffer.
 3. ~~Whether a `/dev/console` device node is required.~~ Resolved: a real `/dev/console` node,
    opened by an OxideBSD getty and login.
 4. ~~The meaning of `secure`.~~ Resolved: FreeBSD's. On an `insecure` terminal, root may not log
