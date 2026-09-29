@@ -23,6 +23,7 @@ for src in "$here"/pages/*.html; do
 done
 cp "$here/style.css" "$out/style.css"
 [ -f "$here/CNAME" ] && cp "$here/CNAME" "$out/CNAME"
+cp "$here/robots.txt" "$out/robots.txt"
 [ -f "$here/favicon.ico" ] && cp "$here/favicon.ico" "$out/favicon.ico"
 [ -d "$here/images" ] && cp -R "$here/images" "$out/"
 
@@ -43,7 +44,7 @@ posts=$(ls "$here"/news/*.html 2>/dev/null | sort -r || true)
 		echo "</ul>"
 	fi
 	echo '<p><a href="atom.xml">Atom feed</a></p>'
-} | page "News - OxideBSD" "../" > "$out/news/index.html"
+} | page "News - OxideBSD" "../" "News from the OxideBSD project." > "$out/news/index.html"
 
 for src in $posts; do
 	name=$(basename "$src")

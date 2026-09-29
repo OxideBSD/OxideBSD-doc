@@ -48,7 +48,7 @@ while read -r file; do
 		sed -f "$sedscript" "$tmp/$file.html"
 		echo "<p class=\"date\">Source: <a href=\"https://github.com/OxideBSD/OxideBSD-doc/blob/master/$file\">$file</a></p>"
 		echo '</div>'
-	} | page "$(printf '%s' "$subject" | escape) - OxideBSD design" "../" > "$out/doc/$name"
+	} | page "$(printf '%s' "$subject" | escape) - OxideBSD design" "../" "OxideBSD design specification: $subject. $status." > "$out/doc/$name"
 done < "$tmp/list"
 
 {

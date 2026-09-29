@@ -58,7 +58,7 @@ jobs:
 
       - name: Site
         run: >
-          make -C website site man doc
+          make -C website site man doc sitemap
           OXDOC=$GITHUB_WORKSPACE/oxidebsd/lib/liboxdoc/target/x86_64-unknown-linux-gnu/release/oxdoc-host
           MANDIR=$GITHUB_WORKSPACE/oxidebsd/share/man
 

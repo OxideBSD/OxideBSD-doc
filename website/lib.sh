@@ -35,9 +35,36 @@ fill() {
 		}' "$4"
 }
 
-# page TITLE ROOT < BODY > OUT: a whole page around a body.
+# The first paragraph of a body, as plain text, cut to about 160 characters (at the end of a
+# sentence if one ends there, else at a word): what search results show under a page's title
+# when it gives no description of its own.
+first_paragraph() {
+	tr '\n' ' ' | awk '{
+		i = index($0, "<p>"); if (i == 0) exit
+		s = substr($0, i + 3); j = index(s, "</p>"); if (j > 0) s = substr(s, 1, j - 1)
+		gsub(/<[^>]*>/, "", s); gsub(/  +/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s)
+		if (length(s) > 160) {
+			s = substr(s, 1, 160)
+			if (match(s, /^.*[.!?] /)) s = substr(s, 1, RLENGTH - 1)
+			else { sub(/ [^ ]*$/, "", s); s = s "..." }
+		}
+		print s
+	}'
+}
+
+# page TITLE ROOT [DESCRIPTION] < BODY > OUT: a whole page around a body. The description
+# (escaped here) defaults to the body's first paragraph.
 page() {
-	fill "$1" "$2" "" "$here/template/head.html"
-	cat
+	body=$(cat)
+	desc=${3-}
+	[ -n "$desc" ] || desc=$(printf '%s\n' "$body" | first_paragraph)
+	extra=
+	if [ -n "$desc" ]; then
+		desc=$(printf '%s' "$desc" | escape | sed 's/"/\&quot;/g')
+		extra="<meta name=\"description\" content=\"$desc\">
+"
+	fi
+	fill "$1" "$2" "$extra" "$here/template/head.html"
+	printf '%s\n' "$body"
 	fill "$1" "$2" "" "$here/template/foot.html"
 }

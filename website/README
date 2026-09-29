@@ -8,6 +8,7 @@ Plain HTML and CSS, put together by build.sh and man.sh (POSIX sh) and a Makefil
 				OxideBSD's share/man (OXDOC can be liboxdoc's oxdoc-host)
 	make doc LOWDOWN=...	add the design specifications (../*.md whose title ends in
 			"design specification"), rendered with lowdown(1)
+	make sitemap		list every page built in sitemap.xml (run it last)
 	make todo		list text still to be written
 	make clean
 
@@ -25,6 +26,8 @@ Layout:
 	template/		the header and footer around every page
 	style.css
 	CNAME			the domain, for GitHub Pages
+	robots.txt		which crawlers are welcome: search engines and archives,
+				not AI/LLM crawlers
 
 A page or post is an HTML fragment whose first line is its title:
 

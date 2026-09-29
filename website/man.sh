@@ -48,7 +48,7 @@ for f in "$tmp"/*.html; do
 		echo '<div class="manual">'
 		cat "$f"
 		echo '</div>'
-	} | page "$name($sec) - OxideBSD" "../" > "$out/man/$page.html"
+	} | page "$name($sec) - OxideBSD" "../" "$name($sec): $(cat "$tmp/$name.$sec.nd")" > "$out/man/$page.html"
 done
 
 # The index.
@@ -78,4 +78,4 @@ section_name() {
 		done
 		echo "</dl>"
 	done
-} | page "Manual pages - OxideBSD" "../" > "$out/man/index.html"
+} | page "Manual pages - OxideBSD" "../" "OxideBSD's manual pages: commands, system calls, library functions, file formats and system administration." > "$out/man/index.html"
