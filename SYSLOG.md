@@ -51,7 +51,7 @@ logged by `syslogd` as `kern.notice`. The kernel's own messages always carry fac
 
 ## 4. `/dev/klog`
 
-4.1. `/dev/klog` is a character device, mode `0600`, owner root.
+4.1. `/dev/klog` is a character device, number (7, 0), mode `0600`, owner root.
 
 4.2. It is exclusive: an open while another descriptor has it open fails with `EBUSY`.
 

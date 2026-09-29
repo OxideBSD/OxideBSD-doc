@@ -20,7 +20,8 @@ the load average and memory statistics the `vm` variables report.
 
 | Path | Role | Source |
 |---|---|---|
-| `sys/sysctl.rs` | The MIB tree, the system call, the kernel's variables | kernel |
+| `sys/kern/kern_sysctl.rs` | The MIB tree, the system call, the kernel's variables | kernel |
+| `sys/modules/sysctl` | Registers the system call | kernel module |
 | `<sys/sysctl.h>`, `sysctl(3)`, `sysctlbyname(3)`, `sysctlnametomib(3)` | C interface | `external/mit/musl` |
 | `/sbin/sysctl` | Reads and sets variables | Rust, `sbin/sysctl` |
 | `/etc/sysctl.conf`, `/etc/sysctl.conf.local` | Settings applied at boot | `etc/sysctl.conf` |
