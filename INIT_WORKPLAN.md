@@ -18,6 +18,7 @@ Last updated 2026-09-29 (step 4).
 | Sockets stage 1: socket layer and protocol switch (`sys/kern/uipc_socket.rs`) | `d6f73cd` | UDP, TCP, raw ICMP are `Protocol`s |
 | Sockets stage 2: `sendmsg`/`recvmsg` (577/578), `get/setsockopt` (579/580), `getpeername` (581), `accept4` (582), flags, options, timeouts, blocking socket waits, UDP `connect`, TCP non-blocking `connect`/`shutdown`/`SO_ERROR` | `a73d4a3`, musl `b37feab1` | `regress/socket-smoke`, 64 checks |
 | Sockets stage 3: local sockets (`sys/kern/uipc_usrreq.rs`), oxfs socket inodes, `socketpair` on them | `38bbcb4` | `regress/socket-smoke`, 165 checks; `wget` HTTPS checked by hand |
+| Sockets stage 4: `SCM_RIGHTS` (hold/release/install, gc, 1024/4096 limits), credentials (`LOCAL_PEERCRED`, `SO_PEERCRED`, `getpeereid`, `SCM_CREDS`, `LOCAL_CREDS[_PERSISTENT]`, `SO_PASSCRED`/`SCM_CREDENTIALS`) | see git log, musl `2af0e5a2` | `regress/socket-smoke`, 213 checks; canary unchanged |
 | Step 4: sysctl(2) + tree, message buffer, `/dev/klog` (7,0), load average, exact memory statistics, tunables with enforced `kern.maxproc`/`kern.maxfiles`, `/sbin/sysctl`, `/sbin/dmesg`, `rc.d/sysctl`, `uname -m` = `amd64` | `f021210`, `75c6e7d`, `1005023`, musl `8f9c13ce` | `sysctl_syscall_smoke` (87 checks), `sysctl_tunables_smoke`; POSIX canary unchanged |
 
 Next free syscall number: **584**.
@@ -25,7 +26,7 @@ Next free syscall number: **584**.
 ## Order
 
 1. ~~Sockets stage 3: local sockets.~~ Done.
-2. Sockets stage 4: descriptor and credential passing.
+2. ~~Sockets stage 4: descriptor and credential passing.~~ Done.
 3. Sockets stage 5: manual pages; UNIX.md closed out.
 4. ~~sysctl, the message buffer and `/dev/klog`, load average, memory statistics, tunables.~~ Done.
 5. syslogd, logger, dmesg, newsyslog (without TLS).
@@ -51,27 +52,14 @@ not be merged into.
 A disk image formatted before stage 2's musl change still holds BusyBox binaries that call the
 retired syscall 142; delete `target/oxfs_disk.img` to reseed.
 
-## 2. Sockets stage 4: descriptors and credentials (`UNIX.md` §§8-9)
+## 2. Sockets stage 4: descriptors and credentials — done
 
-- `sendmsg`/`recvmsg` control data (today `sendmsg` with control is `EOPNOTSUPP`, `recvmsg` returns
-  none): parse and build `cmsghdr`s (musl alignment), 4096-byte limit.
-- `SCM_RIGHTS`: `sys/fs/fd.rs` needs in-flight references, i.e. a description reference held by
-  a message, not by any `(tgid, fd)` slot, and "install a description into the receiver at the
-  lowest free fd" (with `MSG_CMSG_CLOEXEC`). Discarded messages release their references.
-  `MSG_CTRUNC` when the buffer is short (the excess is closed).
-- Garbage collection: mark-and-sweep over in-flight local-socket descriptions, run when a local
-  socket with descriptions in flight is closed (the BSDs' `unp_gc`).
-- Limits: 1024 in flight per user, 4096 system-wide (root: system-wide only), `ETOOMANYREFS`.
-- Credentials: `LOCAL_PEERCRED` (`struct xucred`), `SO_PEERCRED` (`struct ucred`),
-  `getpeereid(3)`, `SCM_CREDS` (`cmsgcred`, filled by the kernel), `LOCAL_CREDS` (`sockcred`) and
-  `LOCAL_CREDS_PERSISTENT` (`sockcred2`, `SCM_CREDS2`), `SO_PASSCRED`/`SCM_CREDENTIALS` with the
-  `EPERM` rule. Effective IDs equal real ones until `SUDO.md`'s work.
-- musl: `SOL_LOCAL`, the `LOCAL_*` and `SCM_*` constants and the four structs in
-  `<sys/socket.h>`/`<sys/un.h>` (values must not collide with musl's existing `SOL_*`, `SO_*`,
-  `SCM_*`: musl already has `SCM_RIGHTS = 1`, `SCM_CREDENTIALS = 2`), and `getpeereid(3)`.
-
-Verification: socket-smoke sections for each; a descriptor sent over its own socket and
-collected; the limits.
+As planned. Settled in the code: `SOL_LOCAL` is 0x200 and `LOCAL_PEERCRED`/`LOCAL_CREDS`/
+`LOCAL_CREDS_PERSISTENT` are 0x1001-0x1003 (FreeBSD's 0 and 1-3 collide with `SOL_IP` and `SO_*`
+in musl); `SCM_CREDS`/`SCM_CREDS2` keep FreeBSD's 3 and 8. A peek shows credentials but leaves
+descriptors in the message. `gc` also runs when a descriptor of an in-flight description is
+closed (a socket sent over itself is never destroyed otherwise). Once a socket's own descriptors
+are gone nobody can read its queue, so it's garbage even while its peer is open.
 
 ## 3. Sockets stage 5: manual pages
 
@@ -82,10 +70,8 @@ Mark `UNIX.md` implemented.
 
 ## 4. sysctl, message buffer, `/dev/klog`, load average, memory statistics — done
 
-Left over, to do with the next musl change (each one relinks BusyBox, ~40 minutes, so they're
-batched with step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`): `struct loadavg`, `struct
-vmtotal` and `CTLFLAG_SKIP` in `<sys/sysctl.h>`, and `getloadavg(3)` reading `vm.loadavg` (today it reads the same
-averages through `sysinfo(2)`). Not done: a kernel API for modules to add variables (`SYSCTL.md`
+The musl leftovers (`struct loadavg`/`vmtotal`/`CTLFLAG_SKIP`, `getloadavg(3)` via `vm.loadavg`, and
+step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`) went in with sockets stage 4 (musl `2af0e5a2`). Not done: a kernel API for modules to add variables (`SYSCTL.md`
 §3.6 is a MAY; add it when a module has something to export, `vfs.oxfs` first). `/proc/meminfo`
 still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
 
@@ -97,8 +83,7 @@ still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
   repetition; `SIGHUP`; `-k` translation; `LOCAL_CREDS` for real sender PIDs. The FreeBSD flag
   set of `SYSLOG.md` §6.2.
 - `usr.bin/logger`, `usr.sbin/newsyslog` (Rust; compression through BusyBox `gzip`/`bzip2`).
-- musl: `LOG_NTP`, `LOG_SECURITY`, `LOG_CONSOLE`; with step 4's leftovers (above) in the same
-  change.
+- musl: `LOG_NTP`, `LOG_SECURITY`, `LOG_CONSOLE` are done (musl `2af0e5a2`).
 - `etc/syslog.conf`, `etc/newsyslog.conf`, `etc/rc.d/syslogd`, `etc/rc.d/newsyslog`,
   `etc/defaults/rc.conf` entries.
 - Tests: host tests of the parsers and formatting; `syslog_syscall_smoke` (`SYSLOG.md` §12.2).
