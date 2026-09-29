@@ -6,7 +6,7 @@ decisions already taken, the traps already found, and how each part is verified.
 `UNIX.md`, `SYSCTL.md`, `SYSLOG.md`, `CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md`
 and `TTY.md`; this file doesn't repeat it. Update it as parts land.
 
-Last updated 2026-09-29.
+Last updated 2026-09-29 (step 4).
 
 ## Done
 
@@ -18,15 +18,16 @@ Last updated 2026-09-29.
 | Sockets stage 1: socket layer and protocol switch (`sys/kern/uipc_socket.rs`) | `d6f73cd` | UDP, TCP, raw ICMP are `Protocol`s |
 | Sockets stage 2: `sendmsg`/`recvmsg` (577/578), `get/setsockopt` (579/580), `getpeername` (581), `accept4` (582), flags, options, timeouts, blocking socket waits, UDP `connect`, TCP non-blocking `connect`/`shutdown`/`SO_ERROR` | `a73d4a3`, musl `b37feab1` | `regress/socket-smoke`, 64 checks |
 | Sockets stage 3: local sockets (`sys/kern/uipc_usrreq.rs`), oxfs socket inodes, `socketpair` on them | `38bbcb4` | `regress/socket-smoke`, 165 checks; `wget` HTTPS checked by hand |
+| Step 4: sysctl(2) + tree, message buffer, `/dev/klog` (7,0), load average, exact memory statistics, tunables with enforced `kern.maxproc`/`kern.maxfiles`, `/sbin/sysctl`, `/sbin/dmesg`, `rc.d/sysctl`, `uname -m` = `amd64` | `f021210`, `75c6e7d`, `1005023`, musl `8f9c13ce` | `sysctl_syscall_smoke` (87 checks), `sysctl_tunables_smoke`; POSIX canary unchanged |
 
-Next free syscall number: **583** (reserved for `sysctl` by `SYSCTL.md` §4.1); then 584 upward.
+Next free syscall number: **584**.
 
 ## Order
 
 1. ~~Sockets stage 3: local sockets.~~ Done.
 2. Sockets stage 4: descriptor and credential passing.
 3. Sockets stage 5: manual pages; UNIX.md closed out.
-4. sysctl, the message buffer and `/dev/klog`, load average, memory statistics, tunables.
+4. ~~sysctl, the message buffer and `/dev/klog`, load average, memory statistics, tunables.~~ Done.
 5. syslogd, logger, dmesg, newsyslog (without TLS).
 6. OpenSSL 3, then syslog over TCP and TLS.
 7. cron, crontab, periodic.
@@ -79,35 +80,16 @@ mdoc pages in `share/man` (lint clean with `oxdoc -T lint`): `unix.4`, `socket.2
 `connect.2`, `listen.2`, `shutdown.2`, `socketpair.2`. Seed them; `build_man_index` picks them up.
 Mark `UNIX.md` implemented.
 
-## 4. sysctl, message buffer, `/dev/klog`, load average, memory statistics (`SYSCTL.md`, `SYSLOG.md` §§3-4)
+## 4. sysctl, message buffer, `/dev/klog`, load average, memory statistics — done
 
-- `sys/kern/kern_sysctl.rs` (the BSD name; update `SYSCTL.md` §2's `sys/sysctl.rs`): the MIB tree,
-  `OID_AUTO` numbering from 256, meta-OIDs `{0,1..5}`, types and format strings, access and
-  tunable flags; `SYS_SYSCTL = 583` with a packed six-field struct; registered by a module
-  (`posix_compat`, or a new one); a kernel API for modules to add nodes.
-- Variables of `SYSCTL.md` §5. `kern.hostname` shares `sethostname(2)`'s state.
-- `uname -m` becomes `amd64` (`sys/syscall/ffi.rs`, `machine: utsname_field("x86_64")`); check
-  what reads it: bmake's `MACHINE`, `config.guess` in the self-hosting builds, any test expecting
-  `x86_64`.
-- Tunables from the kernel command line (`boot::parse_cmdline`): `kern.msgbufsize`,
-  `kern.maxproc`, `kern.maxfiles`; unknown ones logged.
-- Load average: sample runnable processes every 5 s in the timer interrupt, three FSCALE-2048
-  averages; `vm.loadavg`, `getloadavg(3)`, `sysinfo(2)`'s `loads`.
-- Memory statistics: the frame allocator counts free frames (free list plus bump remainder), the
-  kernel counts wired and user frames; `vm.stats.vm.*`, `vm.vmtotal`, `hw.usermem`, `sysinfo`'s
-  `freeram`.
-- Message buffer: a ring (size from `kern.msgbufsize`) fed by every kernel print
-  (`console::serial::_print` and the modules' `oxidebsd_log`), `<N>` tags for prioritised lines.
-  `kern.msgbuf`, `kern.msgbuf_clear`.
-- `/dev/klog`: a new character major (oxfs `Device` dispatch hands it to the kernel, like the tty
-  majors 4-6), mode 0600, exclusive (`EBUSY`), consuming read, blocking with wakeup, `poll`.
-- musl: `<sys/sysctl.h>`, `sysctl(3)`, `sysctlbyname(3)`, `sysctlnametomib(3)`
-  (`__NR_sysctl`, not musl's `__NR__sysctl`).
-- Userland: `/sbin/sysctl` (Rust), `/sbin/dmesg` (Rust), `etc/sysctl.conf`, `etc/rc.d/sysctl`.
-- Tests: `sysctl_syscall_smoke` (C fixture, `SYSCTL.md` §11), a `/dev/klog` check, a tunable
-  boot.
+Left over, to do with the next musl change (each one relinks BusyBox, ~40 minutes, so they're
+batched with step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`): `struct loadavg` and `struct
+vmtotal` in `<sys/sysctl.h>`, and `getloadavg(3)` reading `vm.loadavg` (today it reads the same
+averages through `sysinfo(2)`). Not done: a kernel API for modules to add variables (`SYSCTL.md`
+§3.6 is a MAY; add it when a module has something to export, `vfs.oxfs` first). `/proc/meminfo`
+still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
 
-## 5. syslogd, logger, dmesg, newsyslog (`SYSLOG.md`, without §8.3-8.4)
+## 5. syslogd, logger, newsyslog (`SYSLOG.md`, without §8.3-8.4); dmesg is done
 
 - `usr.sbin/syslogd` (Rust std): `syslog.conf` parser (FreeBSD format, `include`, blocks,
   NetBSD-style `name=value` options), inputs `/dev/log` (local datagram), `/dev/klog`, UDP 514;
@@ -115,7 +97,8 @@ Mark `UNIX.md` implemented.
   repetition; `SIGHUP`; `-k` translation; `LOCAL_CREDS` for real sender PIDs. The FreeBSD flag
   set of `SYSLOG.md` §6.2.
 - `usr.bin/logger`, `usr.sbin/newsyslog` (Rust; compression through BusyBox `gzip`/`bzip2`).
-- musl: `LOG_NTP`, `LOG_SECURITY`, `LOG_CONSOLE`.
+- musl: `LOG_NTP`, `LOG_SECURITY`, `LOG_CONSOLE`; with step 4's leftovers (above) in the same
+  change.
 - `etc/syslog.conf`, `etc/newsyslog.conf`, `etc/rc.d/syslogd`, `etc/rc.d/newsyslog`,
   `etc/defaults/rc.conf` entries.
 - Tests: host tests of the parsers and formatting; `syslog_syscall_smoke` (`SYSLOG.md` §12.2).
