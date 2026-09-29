@@ -1,6 +1,6 @@
 # OxideBSD getty, login and PAM: design specification
 
-Status: **draft for review.** Target release: v0.3.0.
+Status: **accepted design, partly implemented** (not yet: the serial-terminal tests of §9.2, which need `tty01`; init's boot and shutdown records, §8.2; `who`). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `getty(8)`, `gettytab(5)`, `login(1)`,

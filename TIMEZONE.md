@@ -1,6 +1,6 @@
 # OxideBSD time zones: design specification
 
-Status: **draft for review.** Target release: v0.3.0.
+Status: **accepted design, not yet implemented.** Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `tzfile(5)`, `zic(8)`, `zdump(8)`,
