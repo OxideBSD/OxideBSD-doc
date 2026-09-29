@@ -1,13 +1,14 @@
 # Builds oxidebsd.org from website/ and deploys it to GitHub Pages. The manual pages are rendered
 # with oxdoc(1), built from OxideBSD's own tree (only lib/liboxdoc and share/man are checked out);
-# the daily run picks up changes to them there.
+# the daily run picks up changes to them there. The design specifications (*.md here) are rendered
+# with lowdown(1).
 
 name: website
 
 on:
   push:
     branches: [master]
-    paths: ['website/**', '.github/workflows/website.yml']
+    paths: ['website/**', '*.md', '.github/workflows/website.yml']
   schedule:
     - cron: '17 6 * * *'
   workflow_dispatch:
@@ -52,9 +53,12 @@ jobs:
         working-directory: oxidebsd/lib/liboxdoc
         run: cargo build --release --bin oxdoc-host
 
+      - name: lowdown
+        run: sudo apt-get install -y lowdown
+
       - name: Site
         run: >
-          make -C website site man
+          make -C website site man doc
           OXDOC=$GITHUB_WORKSPACE/oxidebsd/lib/liboxdoc/target/x86_64-unknown-linux-gnu/release/oxdoc-host
           MANDIR=$GITHUB_WORKSPACE/oxidebsd/share/man
 

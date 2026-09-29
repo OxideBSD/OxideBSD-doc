@@ -6,11 +6,14 @@ Plain HTML and CSS, put together by build.sh and man.sh (POSIX sh) and a Makefil
 	make man OXDOC=... MANDIR=...
 				add the manual pages, rendered with oxdoc(1) from
 				OxideBSD's share/man (OXDOC can be liboxdoc's oxdoc-host)
+	make doc LOWDOWN=...	add the design specifications (../*.md whose title ends in
+			"design specification"), rendered with lowdown(1)
 	make todo		list text still to be written
 	make clean
 
 .github/workflows/website.yml builds and deploys it to GitHub Pages on a push that changes
-website/, once a day (for manual page changes in OxideBSD), and on demand.
+website/, once a day (for manual page changes in OxideBSD), on a push that changes a specification, and
+on demand.
 
 Layout:
 

@@ -76,6 +76,11 @@ img { max-width: 100%; height: auto; }
 ul.news { list-style: none; padding: 0; }
 ul.news li { margin-bottom: 0.3em; }
 
+/* Design specifications, as lowdown(1) marks them up. */
+.spec table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0.5em 0; }
+.spec th, .spec td { border: 1px solid var(--rule); padding: 0.2em 0.5em; text-align: left; vertical-align: top; }
+.spec h2 { margin-top: 1.5em; }
+
 /* Manual pages, as oxdoc(1) marks them up. */
 
 .manual table.head, .manual table.foot { width: 100%; border-collapse: collapse; }
