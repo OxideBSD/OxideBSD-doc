@@ -63,8 +63,10 @@ with `EPROTONOSUPPORT` (or `EPROTOTYPE` for a protocol that exists under another
    (`MSG_OOB` on `AF_UNIX`, for example) fails with `EOPNOTSUPP`; flags are never ignored.
 5. The `SOL_SOCKET` options `SO_TYPE`, `SO_DOMAIN`, `SO_PROTOCOL`, `SO_ERROR`, `SO_ACCEPTCONN`,
    `SO_RCVBUF`, `SO_SNDBUF`, `SO_RCVLOWAT`, `SO_RCVTIMEO`, `SO_SNDTIMEO`, `SO_REUSEADDR`,
-   `SO_KEEPALIVE`, `SO_LINGER`, `SO_NOSIGPIPE` and `SO_PEERCRED` (§9.2). An unknown option fails with
-   `ENOPROTOOPT`.
+   `SO_KEEPALIVE`, `SO_LINGER`, `SO_BROADCAST`, `SO_NOSIGPIPE` (FreeBSD's, value `0x0800`) and
+   `SO_PEERCRED` (§9.2). An unknown option fails with `ENOPROTOOPT`. `SO_KEEPALIVE`, `SO_LINGER`
+   and `SO_BROADCAST`, and the buffer sizes on Internet sockets, are recorded and reported but
+   not yet acted on.
 6. `SIGPIPE`: sending on a stream or sequenced-packet socket whose write side is shut down, or
    whose peer is gone, fails with `EPIPE` and sends `SIGPIPE` to the calling thread, unless
    `MSG_NOSIGNAL` or `SO_NOSIGPIPE` is set.
@@ -75,9 +77,11 @@ with `EPROTONOSUPPORT` (or `EPROTOTYPE` for a protocol that exists under another
    error or (on a listening socket) a pending connection is available; writable when the send
    would not block. `POLLHUP` once both directions are shut down or the peer is gone.
 
-3.4. **Waiting.** `AF_UNIX` sockets change state only when another process runs, so a waiter
-blocks and is woken, as for pipes. `AF_INET` sockets keep the existing pulled model (the network
-interface is serviced by the waiter).
+3.4. **Waiting.** A protocol never blocks: it reports `EAGAIN`, and the socket layer waits. A
+waiter blocks, so that interrupts (the timer, `alarm(2)`, the keyboard) are taken while it waits;
+`AF_UNIX` waiters are woken by the other process's operation, as for pipes. The network interface
+is serviced by its waiters, so an `AF_INET` waiter is also woken by a received frame and at least
+every 50 ms, to drive the interface and TCP's retransmission timer.
 
 **Rationale.** Today each socket call walks a fixed chain (UDP, then TCP, then ICMP) and the C
 library drops arguments the system calls cannot carry. A protocol switch is how every BSD kernel
@@ -279,14 +283,21 @@ connected to each other. It replaces the pipe-based pair in `sys/fs/pipe.rs`, wh
 
 11.1. UDP, TCP and raw ICMP become protocol-switch entries without changing their protocol
 behavior. They gain what the generic layer provides (§3.3): the `MSG_*` flags, timeouts,
-`SO_ERROR`, `getpeername(2)`, honest address lengths.
+`SO_ERROR`, `getpeername(2)`, honest address lengths. UDP gains `connect(2)` (a default
+destination; while connected only the peer's datagrams are received, as in the BSDs); TCP gains
+non-blocking `connect(2)` (`EINPROGRESS`, then `SO_ERROR`), `shutdown(2)`, and reports a refused,
+timed-out or reset connection once, through `SO_ERROR` or the next call.
+
+11.3. The options `IP_TOS`, `IP_TTL`, `IP_MULTICAST_IF`, `IP_MULTICAST_TTL`, `IP_MULTICAST_LOOP`
+and, on TCP, `TCP_NODELAY` are accepted, recorded and reported back; they don't yet change the
+packets sent.
 
 11.2. An option or flag an `AF_INET` protocol does not implement fails with `ENOPROTOOPT` or
 `EOPNOTSUPP`.
 
 ## 12. Verification
 
-12.1. `tests/unix_syscall_smoke.rs` with a C fixture using the musl API, one `PASS`/`FAIL` line
+12.1. `tests/socket_syscall_smoke.rs` with a C fixture using the musl API (`regress/socket-smoke`), one `PASS`/`FAIL` line
 per check, covering each numbered requirement of §§5–10 that can be observed from one boot:
 naming, permissions, stream/datagram/sequenced-packet semantics, shutdown, descriptor passing
 (including a descriptor sent over its own socket and collected), and every credential interface.
