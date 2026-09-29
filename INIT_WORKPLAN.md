@@ -6,7 +6,16 @@ decisions already taken, the traps already found, and how each part is verified.
 `UNIX.md`, `SYSCTL.md`, `SYSLOG.md`, `CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md`
 and `TTY.md`; this file doesn't repeat it. Update it as parts land.
 
-Last updated 2026-09-29 (step 4).
+Last updated 2026-09-29, end of the session that did sockets stages 3-4 and step 4.
+
+## Where things stand
+
+Everything up to and including sockets stage 4 and step 4 is done, committed and pushed
+(OxideBSD `4d48d3d`, musl `2af0e5a2`, this repository `1f60c04`). **Next: step 3 below, the
+socket manual pages; then step 5, syslogd**, which is what all of this was for. Nothing is in
+flight: no uncommitted work in either repository or the musl fork. The website has `robots.txt`
+(search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
+(`b316818`, deployed); what's left there is the owner's Search Console setup.
 
 ## Done
 
@@ -25,16 +34,19 @@ Next free syscall number: **584**.
 
 ## Order
 
-1. ~~Sockets stage 3: local sockets.~~ Done.
-2. ~~Sockets stage 4: descriptor and credential passing.~~ Done.
-3. Sockets stage 5: manual pages; UNIX.md closed out.
-4. ~~sysctl, the message buffer and `/dev/klog`, load average, memory statistics, tunables.~~ Done.
-5. syslogd, logger, dmesg, newsyslog (without TLS).
-6. OpenSSL 3, then syslog over TCP and TLS.
-7. cron, crontab, periodic.
-8. Time zones.
-9. BusyBox roster cut (one rebuild for everything replaced).
-10. `/sbin/init` (step 3).
+| # | Part | Status |
+|---|---|---|
+| 1 | Sockets stage 3: local sockets | done |
+| 2 | Sockets stage 4: descriptor and credential passing | done |
+| 3 | Sockets stage 5: manual pages; `UNIX.md` marked implemented | **next** |
+| 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | done |
+| 5 | syslogd, logger, newsyslog (without TLS) | to do |
+| 6 | OpenSSL 3, then syslog over TCP and TLS | to do |
+| 7 | cron, crontab, periodic | to do |
+| 8 | Time zones | to do |
+| 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
+| 10 | `/sbin/init` (init's step 3) | to do |
+| — | After step 3: netif ioctls, loopback, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
 
 Steps 4, 7 and 8 don't depend on the socket work and may move earlier. syslogd (5) needs local
 datagram sockets (1). init (10) needs syslog (5) and uses sysctl (4).
@@ -65,8 +77,17 @@ are gone nobody can read its queue, so it's garbage even while its peer is open.
 
 mdoc pages in `share/man` (lint clean with `oxdoc -T lint`): `unix.4`, `socket.2`, `sendmsg.2`
 (and `send`/`sendto` links), `recvmsg.2`, `getsockopt.2`, `getpeereid.3`, `accept.2`, `bind.2`,
-`connect.2`, `listen.2`, `shutdown.2`, `socketpair.2`. Seed them; `build_man_index` picks them up.
-Mark `UNIX.md` implemented.
+`connect.2`, `listen.2`, `shutdown.2`, `socketpair.2`. Seed them in oxfs (`man_man2`/`man4` need
+`ensure_dir`s, as `man3` got for `sysctl.3`); `build_man_index` picks them up. Mark `UNIX.md`
+implemented (its status line, `Status: **...**`), which the website's spec index shows.
+
+Document what the code settled that the spec doesn't say: `SOL_LOCAL` 0x200 and `LOCAL_*`
+0x1001-0x1003; `SCM_CREDS` 3 / `SCM_CREDS2` 8; a peek shows credentials but not descriptors;
+`read(2)` on a socket closes descriptors it can't return; `CMSG_SPACE` padding counts as room
+(a `CMSG_SPACE(sizeof(int))` buffer takes two descriptors, as on Linux); autobind names are five
+hex digits. `oxdoc` lints on the host: `cd lib/liboxdoc && cargo build --release --bin
+oxdoc-host`, then `target/x86_64-unknown-linux-gnu/release/oxdoc-host -T lint PAGE` (the
+`usr.bin/oxdoc` crate builds for OxideBSD only).
 
 ## 4. sysctl, message buffer, `/dev/klog`, load average, memory statistics — done
 
@@ -153,12 +174,14 @@ possible without the gateway); `/sbin/initconf`; `daemon(8)` for `<name>_restart
 - **Build caching**: a musl change used to leave `std` programs and oxfs's embedded copies stale.
   Fixed in `build.rs` (stale executables relinked, `OXIDEBSD_EMBED_STAMP`); if in doubt,
   `objdump -d` the executable and look for the syscall numbers. Never `touch build.rs`.
-- **Regression set** for socket and network changes, one `cargo tv --test` each:
+- **Regression set** for socket, network, fd or process changes, one `cargo tv --test` each
+  (about 25 minutes in all; run it in the background):
   `socket_syscall_smoke basic_boot rtl8139_smoke udp_smoke tcp_smoke poll_smoke ping_smoke
   icmp_smoke socketpair_smoke readv_smoke udp_syscall_smoke tcp_syscall_smoke poll_syscall_smoke
   ppoll_syscall_smoke ping_syscall_smoke socketpair_syscall_smoke rc_syscall_smoke
   std_hello_oxidebsd_syscall_smoke std_process_fs_oxidebsd_syscall_smoke
-  std_thread_net_signal_oxidebsd_syscall_smoke sh_syscall_smoke at_syscall_smoke`.
+  std_thread_net_signal_oxidebsd_syscall_smoke sh_syscall_smoke at_syscall_smoke
+  sysctl_syscall_smoke sysctl_tunables_smoke tty_syscall_smoke init_respawn_smoke fork_wait`.
   After a musl change also `POSIX_PILOT_CANARY_ONLY=1 cargo tv --test posix_conformance_smoke`,
   compared per file with `target/canary_run3.log` (127/173 pass, 2026-09-28).
 - Build logs contain the POSIX pilot's expected per-file compile errors (53 skipped files);
@@ -174,3 +197,25 @@ possible without the gateway); `/sbin/initconf`; `daemon(8)` for `<name>_restart
   parenthesized (braces don't protect commas). Never write the macro prefix `__NR_` in a
   `syscall.h.in` comment. Check new `__NR_*` names and numbers for collisions.
 - New `tests/*.rs` need a `[[test]] harness = false` entry in `Cargo.toml`.
+- **A musl change relinks all of BusyBox** (about 40 minutes, since `libc.a` gets newer). Batch
+  musl edits into one change. The canary (above) then has to be rerun too.
+- **A persistent disk keeps what it was seeded with**: `target/oxfs_disk.img` is mounted, never
+  reseeded, so new files in `/etc`, `/sbin`, `/dev` or rebuilt BusyBox applets only appear after
+  deleting it (the owner has OK'd that; it reformats in seconds). Tests always use a fresh disk.
+  A symptom seen: `wget` failing with "unrecognized syscall number 142" from a stale applet.
+- **Driving a live boot headlessly**: `OXIDEBSD_QEMU_MONITOR=45454 OXIDEBSD_QEMU_DISPLAY=none
+  cargo rv > run.log 2>&1` in the background, wait for `switching to pid 1` in the log, then
+  `scripts/qemu_sendkeys.py 45454 'command' ...`. Note the log's size before sending and read from
+  there. Stop QEMU by process name (`ps -eo pid,comm`), not `pgrep -f`/`pkill -f`, whose pattern
+  matches the shell running them and kills it.
+- **A test kernel that calls `boot::apply_cmdline` replaces the flags the real command line set**:
+  include `-D`, or user output stops reaching COM1 and the test looks silent
+  (`tests/sysctl_tunables_smoke.rs`).
+- To make the kernel print something from user space in a test, call an unregistered syscall
+  number: it logs `unrecognized syscall number N`, once per number.
+- `poll`/`select`/`ppoll` are registered by the `socket` module: a test that polls anything (a
+  pipe, `/dev/klog`) must load it, or `poll` is `ENOSYS`.
+- **Every syscall-reachable change gets a test first-run before believing it**: this session's own
+  test expectations were wrong four times (two gc cases, a control-buffer size, a weekday) and the
+  kernel right; and the kernel was wrong once (an overflow in `kern.msgbuf`'s read, a kernel panic
+  any user could trigger). Check which it is before changing either.
