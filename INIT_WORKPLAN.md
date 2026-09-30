@@ -165,6 +165,9 @@ The original plan:
   on FreeBSD. pid 1 (`/sbin/init_sh`) stays a static PIE (FreeBSD's `NO_SHARED` init), everything
   else dynamic. Shared libraries `/bin` and `/sbin` need move to `/lib`: `/lib/libc.so` (the real
   file, `ld-musl-x86_64.so.1` beside it), `/lib/libgcc_s.so.1`; `/usr/lib/libc.so` a symlink.
+  **Done (`a9b8d5b`, `ab98faf`)**. pid 1 is `/bin/sh` (kernel-embedded), so it and
+  `/sbin/emergency` are the static ones; `init_sh` is dynamic. Needed `--eh-frame-hdr` in
+  musl-gcc (musl `27a3d66f`) for unwinding through shared libraries.
 - Rust binding for syslogd: the `openssl` crate against the sysroot (`OPENSSL_DIR`,
   `OPENSSL_STATIC`); `openssl-sys`'s build script may need the `oxidebsd` target added (the libc
   crate fork shows how).
