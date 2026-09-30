@@ -147,14 +147,18 @@ The original plan:
   legacy provider as a `dlopen`ed module, a PIE `/usr/bin/openssl`, static archives too. Needed
   first: biased load of dynamically linked PIEs (`f9fb253`), one musl build for `libc.a` and
   `libc.so` (`e40cc9f`), file `mmap` at a nonzero offset and the oxfs `shm` inode flag (`026e9ba`).
-  `tests/openssl_syscall_smoke.rs` covers it. Still to do in this step: the trust store and
-  certctl, `openssl-sys`, syslogd over TCP/TLS.
+  `tests/openssl_syscall_smoke.rs` covers it. Still to do in this step: `openssl-sys`, syslogd
+  over TCP/TLS.
 - `regress/openssl-syscall-smoke`: KATs (SHA-256, AES-GCM, RSA/ECDSA, `RAND_bytes`) and a TLS 1.3
   handshake over an in-process memory BIO pair (no loopback, no Perl on target).
 - Trust store: vendor Mozilla NSS `certdata.txt` (MPL-2.0), split at build time into
   `/usr/share/certs/{trusted,untrusted}/*.pem`, honouring its trust/distrust bits (as FreeBSD's
   `secure/caroot`). `usr.sbin/certctl` (Rust std, `certctl(8)` mdoc page): `rehash`, `list`,
   `untrust`, `trust`, writing `<subject-hash>.N` links in `/etc/ssl/certs` and `/etc/ssl/cert.pem`.
+  **Done (`31c5c69`, `d33a27d`)**: NSS 3.130, 121 roots; the logic is `lib/libcertstore` (pure
+  Rust, OpenSSL's subject hash reimplemented and checked against the host's `openssl`), shared by
+  `certctl` and `build.rs`, which seeds `/etc/ssl` at build time. Distrust-after dates aren't
+  enforced (as FreeBSD).
 - Rust binding for syslogd: the `openssl` crate against the sysroot (`OPENSSL_DIR`,
   `OPENSSL_STATIC`); `openssl-sys`'s build script may need the `oxidebsd` target added (the libc
   crate fork shows how).

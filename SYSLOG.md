@@ -261,5 +261,6 @@ program block route correctly; a pipe action receives its lines; `SIGHUP` reopen
 
 ## 13. Open questions
 
-1. A system bundle of trusted certificate authorities (`/etc/ssl`, FreeBSD's `certctl(8)`). Until
-   one exists, TLS peers are verified only against `tls_ca`, `tls_cadir` or pinned fingerprints.
+1. ~~A system bundle of trusted certificate authorities.~~ Settled: `/etc/ssl/cert.pem` and
+   `/etc/ssl/certs`, maintained by `certctl(8)`, are OpenSSL's defaults, so a TLS action with no
+   `tls_ca`/`tls_cadir` verifies against them.
