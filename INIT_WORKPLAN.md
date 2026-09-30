@@ -11,8 +11,7 @@ Last updated 2026-09-29, end of the session that did sockets stage 5 and step 5.
 ## Where things stand
 
 Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
-`2e49de9`, `9056be8`; not yet pushed). **Next: step 6 (OpenSSL, then syslog over TCP and TLS),
-or step 7 (cron) or 8 (time zones), which don't depend on it.** Nothing is in flight. The website has `robots.txt`
+`2e49de9`, `9056be8`; not yet pushed). **Next: step 8 (time zones)**, then 6 or 7. Nothing is in flight. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
 
@@ -32,6 +31,8 @@ or step 7 (cron) or 8 (time zones), which don't depend on it.** Nothing is in fl
 | Sockets stage 5: manual pages (`socket.2` ... `unix.4`, `getpeereid.3`); `UNIX.md` implemented | `60d0b7f` | lint clean |
 | oxfs: `flock` on write descriptors; buffered writes visible to other descriptors | `2e49de9` | found by syslogd's pid file; `needs-syscall-smoke` |
 | Step 5: `lib/libsyslog`, syslogd, logger, newsyslog, `etc/` files, rc.d, six manual pages | `9056be8` | `syslog_syscall_smoke` (36 checks); 37 host tests; regression set passes |
+| oxfs: dynamic inode tables (inode file per pool, `SUPERBLOCK_VERSION` 4) | `475e995` | 5821 inodes after seeding; remount checked by hand |
+| oxfs: inodes and blocks freed when nothing refers to them (`oxidebsd_inode_in_use`, orphans, mount sweep) | `13113f8` | `needs-syscall-smoke`; POSIX canary identical |
 
 Next free syscall number: **584**.
 
@@ -160,8 +161,8 @@ The original plan:
 - Vendor IANA tzdata + tzcode at `external/public-domain/tz`; build `zic` for the host, compile
   the zones, seed `/usr/share/zoneinfo`; build `zic`/`zdump` for the target; `usr.sbin/tzsetup`
   (Rust).
-- **Check oxfs's inode budget first**: `MAX_INODES = 8192`, and the zones add ~600 files. Raising
-  it changes the on-disk layout (`SUPERBLOCK_VERSION` bump, automatic reformat).
+- oxfs's inode count is no longer fixed (`475e995`, `13113f8`), so the zones' ~600 files need
+  no layout change.
 - syslogd and cron re-read the zone on `SIGHUP`.
 - Test: `tz_syscall_smoke`.
 
