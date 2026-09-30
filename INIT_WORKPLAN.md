@@ -171,7 +171,10 @@ The original plan:
   `openssl-sys` needs no patch, just `OPENSSL_DIR` and `CC_x86_64_unknown_oxidebsd`; it links the
   shared libraries. `regress/std/openssl-rs-smoke` covers it (TLS 1.3 over a `UnixStream` pair).
 - syslogd: RFC 6587 framing, `@@host`, `tcp_server`; RFC 5425 with `@[host]:port(...)`, the
-  `tls_*` options, verification, queueing and reconnect (§8.5).
+  `tls_*` options, verification, queueing and reconnect (§8.5). Decided 2026-09-30: all in the
+  existing single `poll(2)` loop, as the BSDs do (non-blocking sockets, OpenSSL's
+  `WANT_READ`/`WANT_WRITE`), no threads; and **a loopback interface first** (`lo0`,
+  `127.0.0.0/8`), so the on-target test runs two syslogds on one machine.
 - Open: `SYSLOG.md` §13 (beyond the trust store above).
 
 ## 7. cron, crontab, periodic (`CRON.md`)
