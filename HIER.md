@@ -1,57 +1,8 @@
-# OxideBSD filesystem hierarchy (`hier`)
+# OxideBSD program inventory
 
-OxideBSD's equivalent of FreeBSD's `hier(7)`: where programs live, and why. The rules follow the
-BSD convention (FreeBSD/NetBSD/OpenBSD agree on the core of it); where OxideBSD deviates, it says
-so. The source tree mirrors this: `bin/*` builds programs for `/bin`, `usr.bin/*` for `/usr/bin`,
-`sbin/*` for `/sbin`, `usr.sbin/*` for `/usr/sbin`.
-
-## The four main directories
-
-| Directory | What goes there | Test |
-|---|---|---|
-| `/bin` | Essential **user** commands | Needed in single-user mode, with only the root filesystem, to use and repair the system |
-| `/sbin` | Essential **system administration** commands | Needed to boot, mount, configure the network, or shut down -- usually root-only |
-| `/usr/bin` | All other **user** commands | Everything a user runs that isn't essential |
-| `/usr/sbin` | All other **administration** commands and **daemons** | Services, user management, diagnostics, anything root-only and non-essential |
-
-Deciding questions, in order: *Does single-user repair need it?* (yes: `/bin` or `/sbin`)
-*Is it for administering the system rather than using it?* (yes: an `sbin`).
-
-Deliberate deviations from FreeBSD, each so single-user repair has what it actually needs:
-`vi` lives in `/bin` (FreeBSD and OpenBSD ship `/usr/bin/vi`), and so do `grep`, `sed`, `tar` and
-`gzip`/`gunzip`/`zcat` (all `/usr/bin` on FreeBSD).
-
-## Other program locations
-
-| Directory | Purpose |
-|---|---|
-| `/usr/libexec` | Helpers other programs run, not users: `getty`, later the rc/init helpers |
-| `/usr/games` | Games: `doom` |
-| `/usr/tests` | Test programs (FreeBSD's convention) -- not on anyone's `PATH` |
-| `/usr/local/bin`, `/usr/local/sbin` | Third-party software installed later (ports/packages), never base |
-
-Default `PATH`: root gets `/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/games`; users get
-`/bin:/usr/bin:/usr/local/bin:/usr/games` (`/usr/games` last, as on OpenBSD).
-
-## Libraries and data
-
-| Path | What goes there |
-|---|---|
-| `/lib` | Shared libraries the programs in `/bin` and `/sbin` need, so they run with only the root filesystem: `libc.so` (musl's, which is also the dynamic linker), `ld-musl-x86_64.so.1` (a link to it), `libgcc_s.so.1` (the unwinder, LLVM libunwind) |
-| `/usr/lib` | Every other library, static and shared (`libcrypto.so.3`, `libssl.so.3`, `libc.a`, ...), and links to `/lib`'s under the names a link looks for (`libc.so`, `libgcc_s.so`); `ossl-modules` (OpenSSL's loadable providers), `clang/23` |
-| `/usr/include` | C headers |
-| `/usr/share/certs/trusted`, `/usr/share/certs/untrusted` | The base system's certificate authorities, from Mozilla's list, as PEM files (FreeBSD's layout) |
-| `/etc/ssl` | OpenSSL's directory: `openssl.cnf`; `cert.pem` and `certs/` (the trusted authorities, as a bundle and as `<hash>.<n>` links), `untrusted/`, all maintained by `certctl(8)` |
-
-Every program is dynamically linked except what the kernel starts as pid 1 (`/bin/sh`,
-`/sbin/emergency`), which is static, so a broken shared library can't stop the system from
-reaching single-user mode (as FreeBSD links `init` with `NO_SHARED`).
-
-## Init system placement
-
-`/sbin/init` (pid 1), `/sbin/rcorder`, `/etc/rc` (the boot script), `/etc/rc.d/*` (one script per
-service), `/etc/rc.conf` (settings, `foo_enable="YES"`), `/etc/rc.shutdown`. See the init design
-doc once written.
+Where each program in the base system is installed, and the BusyBox applets taken out of it. A
+working list, not a specification: the rules for where things go, and every directory, are in
+`hier(7)` (`share/man/man7/hier.7` in the OxideBSD tree, and on the website's manual pages).
 
 ## Where every current binary goes (227 programs)
 
