@@ -135,16 +135,26 @@ The original plan:
 
 ## 6. OpenSSL 3; syslog over TCP and TLS (`SYSLOG.md` §§8.3-8.5)
 
-- Vendor OpenSSL 3 at `external/apache2/openssl` (a plain release tree or a fork, as decided when
-  starting). `build.rs`: `Configure` with a custom OxideBSD target (static, `no-shared`,
-  musl-gcc), install `libssl.a`/`libcrypto.a`/headers into the sysroot, seed `/usr/bin/openssl`.
-  The build is Perl-driven and long: stamp it like the LLVM builds.
+- Vendor OpenSSL 3.5 LTS (`openssl-3.5.9`) as a submodule at `external/apache2/openssl`, on an
+  upstream release tag with no patches (decided 2026-09-29). The `oxidebsd-x86_64` Configure target
+  lives in our tree and is loaded with `Configure --config=`. `build.rs`: static PIE via musl-gcc,
+  `no-shared no-dso no-afalgeng no-ktls` (musl-gcc defines `__linux__`, so OpenSSL takes its Linux
+  paths), `OPENSSLDIR=/etc/ssl`; install `libssl.a`/`libcrypto.a`/headers into the sysroot, seed
+  `/usr/bin/openssl` and `/etc/ssl/openssl.cnf`. Stamp it like the LLVM builds.
+- asm on. The kernel saves only FXSAVE state (no XSAVE), so OpenSSL's OSXSAVE check must keep it
+  off AVX; the smoke test confirms that.
+- `regress/openssl-syscall-smoke`: KATs (SHA-256, AES-GCM, RSA/ECDSA, `RAND_bytes`) and a TLS 1.3
+  handshake over an in-process memory BIO pair (no loopback, no Perl on target).
+- Trust store: vendor Mozilla NSS `certdata.txt` (MPL-2.0), split at build time into
+  `/usr/share/certs/{trusted,untrusted}/*.pem`, honouring its trust/distrust bits (as FreeBSD's
+  `secure/caroot`). `usr.sbin/certctl` (Rust std, `certctl(8)` mdoc page): `rehash`, `list`,
+  `untrust`, `trust`, writing `<subject-hash>.N` links in `/etc/ssl/certs` and `/etc/ssl/cert.pem`.
 - Rust binding for syslogd: the `openssl` crate against the sysroot (`OPENSSL_DIR`,
   `OPENSSL_STATIC`); `openssl-sys`'s build script may need the `oxidebsd` target added (the libc
   crate fork shows how).
 - syslogd: RFC 6587 framing, `@@host`, `tcp_server`; RFC 5425 with `@[host]:port(...)`, the
   `tls_*` options, verification, queueing and reconnect (§8.5).
-- Open: a system CA bundle (`/etc/ssl`, `certctl(8)`), `SYSLOG.md` §13.
+- Open: `SYSLOG.md` §13 (beyond the trust store above).
 
 ## 7. cron, crontab, periodic (`CRON.md`)
 
