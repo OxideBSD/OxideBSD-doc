@@ -1,6 +1,7 @@
 # OxideBSD sockets and local sockets: design specification
 
-Status: **accepted design, implemented** (sockets stages 1-5, 2026-09-29). Target release: v0.3.0.
+Status: **accepted design, implemented** (sockets stages 1-5, 2026-09-29; the loopback interface
+and local addresses, §11.4-11.6, 2026-09-30). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `socket(2)`, `sendmsg(2)`, `recvmsg(2)`,
@@ -25,7 +26,10 @@ named in the file system or in the abstract namespace, or unnamed.
 1.4. A socket system-call interface that carries every argument POSIX defines, replacing the
 reduced forms in use today (§4).
 
-1.5. Out of scope: `AF_INET6`, a loopback interface, and `SO_PASSSEC`/`SCM_SECURITY`.
+1.5. The loopback interface, `lo0`, and the local address of an Internet socket (§11.4-11.6).
+
+1.6. Out of scope: `AF_INET6`, configuring interfaces and routes at run time (`ifconfig`,
+`route`, their ioctls and routing sockets), and `SO_PASSSEC`/`SCM_SECURITY`.
 
 ## 2. Components
 
@@ -35,6 +39,8 @@ reduced forms in use today (§4).
 | `sys/kern/uipc_usrreq.rs` | `AF_UNIX`: addresses, connections, buffers, descriptor and credential passing |
 | `sys/netinet/` | `AF_INET` protocols (`ip`, `udp`, `tcp`, `icmp`, `arp`), as protocol-switch entries |
 | `sys/net/` | Interfaces and Ethernet |
+| `sys/net/ifnet.rs` | The interfaces (`lo0`, `rl0`) and the route lookup (§11.4) |
+| `sys/net/if_loop.rs` | `lo0`'s output queue (§11.4) |
 | `sys/drivers/rtl8139.rs` | The network interface driver (moved from `sys/net/`) |
 | `sys/modules/socket` | Registers the socket system calls, for every family (renamed from `sys/modules/net`) |
 | `sys/modules/oxfs` | Socket inodes (`S_IFSOCK`) |
@@ -288,12 +294,44 @@ destination; while connected only the peer's datagrams are received, as in the B
 non-blocking `connect(2)` (`EINPROGRESS`, then `SO_ERROR`), `shutdown(2)`, and reports a refused,
 timed-out or reset connection once, through `SO_ERROR` or the next call.
 
+11.2. An option or flag an `AF_INET` protocol does not implement fails with `ENOPROTOOPT` or
+`EOPNOTSUPP`.
+
 11.3. The options `IP_TOS`, `IP_TTL`, `IP_MULTICAST_IF`, `IP_MULTICAST_TTL`, `IP_MULTICAST_LOOP`
 and, on TCP, `TCP_NODELAY` are accepted, recorded and reported back; they don't yet change the
 packets sent.
 
-11.2. An option or flag an `AF_INET` protocol does not implement fails with `ENOPROTOOPT` or
-`EOPNOTSUPP`.
+11.4. **Interfaces and routes.** There are two interfaces, configured at boot, as the host's
+addressing has always been static (no DHCP client):
+
+| Interface | Address | Output |
+|---|---|---|
+| `lo0` | 127.0.0.1/8 | Queued, and taken back in by the receive path (`if_loop`) |
+| `rl0` | 10.0.2.15/24 | The rtl8139 driver (FreeBSD's `rl`); fails while no driver is attached |
+
+A route lookup decides, for a destination, the interface a packet leaves by, the next hop and the
+source address: 127.0.0.0/8, and the host's own addresses, go over `lo0` (as BSD routes a
+host's own address through its loopback interface); `rl0`'s subnet goes out `rl0` directly;
+everything else goes out `rl0` through the default gateway, 10.0.2.2. A looped packet MUST NOT be
+delivered inside the send that produced it (a protocol would re-enter its own lock): it is queued
+and taken by the next pass of the receive path, which runs looped packets before the NIC's and
+wakes whoever waits on a socket, as a received frame does. A packet arriving on `rl0` is taken
+only if it is addressed to `rl0`'s address; one with a source in 127.0.0.0/8 is dropped (a
+"martian", as in the BSDs). Over `lo0`, any address of the host is accepted.
+
+11.5. **Local addresses.** An Internet socket has a local address as well as a port. `bind(2)`
+takes `INADDR_ANY` or an address of the host; any other fails with `EADDRNOTAVAIL`. A socket
+bound to an address receives only what is sent to it: a listener or UDP socket on 127.0.0.1
+hears only `lo0`. A socket sends from its bound address, or, bound to `INADDR_ANY`, from the
+route's source address for the destination. A TCP connection is identified by the full four-tuple
+of local and remote address and port (over `lo0` both of its ends are in the one host).
+`getsockname(2)` reports the socket's real local address: the connection's, the bound one, or
+`INADDR_ANY`. An echo reply is sent from the address the request was sent to. `/etc/hosts`
+names 127.0.0.1 `localhost`.
+
+11.6. **Closing a TCP connection.** `close(2)` and `shutdown(2)` with `SHUT_WR` MUST NOT discard
+data already written: the FIN is sent after the last of it, and a `send(2)` after the close has
+been asked for fails with `EPIPE`.
 
 ## 12. Verification
 
@@ -304,6 +342,13 @@ naming, permissions, stream/datagram/sequenced-packet semantics, shutdown, descr
 
 12.2. The existing `udp`, `tcp`, `poll`, `ppoll`, `socketpair`, `ping` and `std` networking
 tests MUST pass unchanged, and `wget` over HTTPS MUST still work.
+
+12.3. `tests/loopback_syscall_smoke.rs`, a Rust program (`regress/std/loopback-smoke`) and a
+script: `localhost` resolves to 127.0.0.1; UDP over 127.0.0.1 and to the host's own address; a TCP
+exchange larger than one segment over 127.0.0.1, closed by the writer (§11.6); a listener bound to
+127.0.0.1 refuses a connection to 10.0.2.15; a closed port is refused at once; binding another
+host's address is `EADDRNOTAVAIL`; `ping` of 127.0.0.1 and of 10.0.2.15. The kernel's unit tests
+check the route lookup (§11.4).
 
 ## 13. Open questions
 

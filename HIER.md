@@ -33,6 +33,20 @@ Deliberate deviations from FreeBSD, each so single-user repair has what it actua
 Default `PATH`: root gets `/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/games`; users get
 `/bin:/usr/bin:/usr/local/bin:/usr/games` (`/usr/games` last, as on OpenBSD).
 
+## Libraries and data
+
+| Path | What goes there |
+|---|---|
+| `/lib` | Shared libraries the programs in `/bin` and `/sbin` need, so they run with only the root filesystem: `libc.so` (musl's, which is also the dynamic linker), `ld-musl-x86_64.so.1` (a link to it), `libgcc_s.so.1` (the unwinder, LLVM libunwind) |
+| `/usr/lib` | Every other library, static and shared (`libcrypto.so.3`, `libssl.so.3`, `libc.a`, ...), and links to `/lib`'s under the names a link looks for (`libc.so`, `libgcc_s.so`); `ossl-modules` (OpenSSL's loadable providers), `clang/23` |
+| `/usr/include` | C headers |
+| `/usr/share/certs/trusted`, `/usr/share/certs/untrusted` | The base system's certificate authorities, from Mozilla's list, as PEM files (FreeBSD's layout) |
+| `/etc/ssl` | OpenSSL's directory: `openssl.cnf`; `cert.pem` and `certs/` (the trusted authorities, as a bundle and as `<hash>.<n>` links), `untrusted/`, all maintained by `certctl(8)` |
+
+Every program is dynamically linked except what the kernel starts as pid 1 (`/bin/sh`,
+`/sbin/emergency`), which is static, so a broken shared library can't stop the system from
+reaching single-user mode (as FreeBSD links `init` with `NO_SHARED`).
+
 ## Init system placement
 
 `/sbin/init` (pid 1), `/sbin/rcorder`, `/etc/rc` (the boot script), `/etc/rc.d/*` (one script per
@@ -42,7 +56,8 @@ doc once written.
 ## Where every current binary goes (227 programs)
 
 This is the seeded layout (2026-09-23). The source tree mirrors it, except for the BusyBox
-applets, which all build from `external/gpl2/busybox`.
+applets, which all build from `external/gpl2/busybox`. Added since, among others: `/usr/bin/openssl`
+and `/usr/sbin/certctl` (2026-09-30).
 
 ### `/bin` (44)
 `ash`, `cat`, `chmod`, `cp`, `date`, `dd`, `df`, `echo`, `ed`, `egrep`, `expr`, `false`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `hush`, `kill`, `link`, `ln`, `ls`, `mkdir`, `mv`, `nproc`, `pgrep`, `pkill`, `pwd`, `realpath`, `rm`, `rmdir`, `sed`, `sh`, `sleep`, `stty`, `sync`, `tar`, `test`, `timeout`, `touch`, `true`, `unlink`, `vi`, `zcat`

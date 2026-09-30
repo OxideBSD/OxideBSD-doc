@@ -162,17 +162,20 @@ releases — each ships standalone rather than bundling everything into one v0.2
   already uses (both genuinely supported by this kernel's own `pipe2(2)`/`fcntl(2)`). Threads,
   signals and `std::net` socket plumbing have since been exercised through `std` too
   (`std-thread-net-signal-oxidebsd`). Still a hand-maintained pair of private forks, not anything
-  upstreamable; `panic=abort` only.
+  upstreamable. Panics unwind (`panic_unwind`, `catch_unwind` tested).
 
   **v0.3.0 scope, decided 2026-09-23:** (1) **GCC** as a real on-target port (not started);
   (2) **finish `std`** -- the whole surface a `/bin` utility needs, verified by a std coverage
-  consumer, **static-PIE** std binaries (musl's self-relocating `rcrt1` + the kernel's existing
-  random-bias loader), and the 12 native `bin/` utilities **rewritten as std apps**; (3) a native
+  consumer, **PIE** std binaries -- since 2026-09-30 dynamically linked on `/lib/libc.so` and
+  `/lib/libgcc_s.so.1` (LLVM libunwind), pid 1 alone a static PIE -- and the 12 native `bin/`
+  utilities **rewritten as std apps**; (3) a native
   **init system** -- `/sbin/init` as a Rust std app, FreeBSD/NetBSD-style `/etc/rc` + `rc.d` +
   `rcorder` + `rc.conf`, replacing `hush` as pid 1. Clang *rebuilding itself* on-target is **not**
   v0.3.0: it needs Python (LLVM's CMake) and CMake, which move later. Landed toward it already: the
   C++ stage (libc++, on-target `clang++`), the whole `*at()` family, `ppoll(2)`, demand-grown user
-  stacks, and ninja on-target (see `CLAUDE.md`). Placement of every binary: `HIER.md`.
+  stacks, and ninja on-target (see `CLAUDE.md`); and, 2026-09-30, OpenSSL 3.5 LTS with the
+  system trust store (`certctl(8)`), the `openssl` crate, dynamic linking with `dlopen`, the
+  loopback interface (`UNIX.md` §11.4), and syslog over TCP and TLS (`SYSLOG.md` §8). Placement of every binary: `HIER.md`.
 
   **Added 2026-09-24:** (4) **a cleanup phase** -- OxideBSD should *act like a regular OS* rather
   than take shortcuts; every known shortcut and its target is inventoried in `CLEANUP.md`;

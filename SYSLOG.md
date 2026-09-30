@@ -175,8 +175,9 @@ BSD `syslogd` has plain TCP. Receiving is enabled by the global options `tcp_ser
 framing.
 
 8.4. **TLS** (RFC 5425, NetBSD's configuration). An `@[host]:port(options)` action sends over TLS
-(default port 6514), framed as in §8.3. The options are `subject="..."` (the certificate subject
-or `subjectAltName` required), `fingerprint="SHA-256:..."` (the certificate required), `cert=file`
+(default port 6514), framed as in §8.3, each message in RFC 5424 form. The options are
+`subject="..."` (the name required instead of the host name: the certificate's common name, or a
+`subjectAltName` DNS name or address), `fingerprint="SHA-256:..."` (the certificate required), `cert=file`
 (pin a certificate) and `verify="off"`. Receiving and verification use the global options:
 
 | Option | Meaning | Default |
@@ -257,7 +258,9 @@ host `syslogd`s (TLS with a test authority, a pinned fingerprint, and a rejected
 12.2. `tests/syslog_syscall_smoke.rs`: on target, `syslogd` with a test configuration; messages
 from `syslog(3)`, `logger` and the kernel land in the configured files; a selector with `!` and a
 program block route correctly; a pipe action receives its lines; `SIGHUP` reopens a rotated file;
-`/dev/klog` refuses a second open; `dmesg` shows boot messages.
+`/dev/klog` refuses a second open; `dmesg` shows boot messages; and a receiving and a sending
+`syslogd` over the loopback interface: a message crosses TCP, and TLS with the receiver's
+`tls_gen_cert` certificate pinned by fingerprint, and a wrong fingerprint is refused.
 
 ## 13. Open questions
 

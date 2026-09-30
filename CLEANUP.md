@@ -59,10 +59,9 @@ removed from this list when its fix lands, with the commit noted in the history 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | The guest's IP address and gateway are compiled in; no `ifconfig`, no DHCP client. | Configured at boot (`rc.conf`) | v0.3.0 (`INIT.md`: `ifconfig_*`) |
-| One routing rule (off-subnet goes to the gateway). | A routing table | later |
+| A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces configured at build time. | A routing table and `ifconfig`/`route` | later |
 | Incoming packets are only processed when a process calls into the network stack (the NIC is polled, not interrupt-driven), so `poll`/`select` on a socket must keep running instead of blocking, and can't also see keystrokes in the same call. | Interrupt-driven receive | v0.3.0 |
 | TCP is stop-and-wait with a fixed 536-byte segment size, no window or congestion control. | Real TCP | later |
-| No loopback interface; no named or datagram `AF_UNIX` sockets (so no `/dev/log`, no syslog). | Both | v0.3.0 (syslog needs them, `INIT.md`) |
 | No IPv6. | IPv6 | later |
 
 ## 6. Userland and build
@@ -71,8 +70,10 @@ removed from this list when its fix lands, with the commit noted in the history 
 |---|---|---|
 | Every file on the system is embedded in the kernel's oxfs module at build time and seeded on format. | A root filesystem image built separately and installed | later (installer) |
 | BusyBox applets are 195 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
-| User programs link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 (static-PIE `std` binaries) |
-| No `dlopen`; `mprotect` enforcement limited to the `mmap` window. | Both | later |
+| The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
+| `mprotect` enforcement limited to the `mmap` window. | Everywhere | later |
+| A PIE's `brk` heap starts at its unbiased end address, low in memory, not after the randomized image; musl's allocator falls back to `mmap` when growing it fails. | The heap follows the image | later |
+| After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
 | The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
 | `/etc/passwd` and `/etc/group` can't be changed by any tool (`adduser`, `passwd`...). | They can | v0.3.0 |
 
@@ -94,3 +95,8 @@ Record removed shortcuts here as `date — item — commit`.
 - 2026-09-25 — kernel stacks have guard pages (`memory::kstack`) — 124974b
 - 2026-09-25 — a write that fails `EPIPE` raises `SIGPIPE` — a10bb36
 - 2026-09-25 — a process killed while blocked in a FIFO `open()` gives back its reader/writer count — a10bb36
+- 2026-09-30 — dynamically linked programs: every `ET_DYN` executable gets an ASLR bias, `PT_INTERP` or not (`execve`, the kernel's `spawn`); one musl build makes `libc.a` and `libc.so` — f9fb253, e40cc9f, a9b8d5b
+- 2026-09-30 — a file `mmap` at a nonzero offset (it was `EINVAL`), so `ld.so` loads shared libraries and `dlopen` works — 026e9ba
+- 2026-09-30 — Rust `std` programs are PIEs, dynamically linked on `/lib/libc.so` and `/lib/libgcc_s.so.1` (pid 1 static) — ab98faf
+- 2026-09-30 — a loopback interface, `lo0`, and sockets with real local addresses; `/etc/hosts` — c22d920
+- 2026-09-30 — TCP no longer drops data still buffered at `close()`/`shutdown(SHUT_WR)` — c22d920
