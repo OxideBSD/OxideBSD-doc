@@ -6,14 +6,13 @@ decisions already taken, the traps already found, and how each part is verified.
 `UNIX.md`, `SYSCTL.md`, `SYSLOG.md`, `CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md`
 and `TTY.md`; this file doesn't repeat it. Update it as parts land.
 
-Last updated 2026-09-29, end of the session that did sockets stages 3-4 and step 4.
+Last updated 2026-09-29, end of the session that did sockets stage 5 and step 5.
 
 ## Where things stand
 
-Everything up to and including sockets stage 4 and step 4 is done, committed and pushed
-(OxideBSD `4d48d3d`, musl `2af0e5a2`, this repository `1f60c04`). **Next: step 3 below, the
-socket manual pages; then step 5, syslogd**, which is what all of this was for. Nothing is in
-flight: no uncommitted work in either repository or the musl fork. The website has `robots.txt`
+Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
+`2e49de9`, `9056be8`; not yet pushed). **Next: step 6 (OpenSSL, then syslog over TCP and TLS),
+or step 7 (cron) or 8 (time zones), which don't depend on it.** Nothing is in flight. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
 
@@ -30,6 +29,10 @@ flight: no uncommitted work in either repository or the musl fork. The website h
 | Sockets stage 4: `SCM_RIGHTS` (hold/release/install, gc, 1024/4096 limits), credentials (`LOCAL_PEERCRED`, `SO_PEERCRED`, `getpeereid`, `SCM_CREDS`, `LOCAL_CREDS[_PERSISTENT]`, `SO_PASSCRED`/`SCM_CREDENTIALS`) | see git log, musl `2af0e5a2` | `regress/socket-smoke`, 213 checks; canary unchanged |
 | Step 4: sysctl(2) + tree, message buffer, `/dev/klog` (7,0), load average, exact memory statistics, tunables with enforced `kern.maxproc`/`kern.maxfiles`, `/sbin/sysctl`, `/sbin/dmesg`, `rc.d/sysctl`, `uname -m` = `amd64` | `f021210`, `75c6e7d`, `1005023`, musl `8f9c13ce` | `sysctl_syscall_smoke` (87 checks), `sysctl_tunables_smoke`; POSIX canary unchanged |
 
+| Sockets stage 5: manual pages (`socket.2` ... `unix.4`, `getpeereid.3`); `UNIX.md` implemented | `60d0b7f` | lint clean |
+| oxfs: `flock` on write descriptors; buffered writes visible to other descriptors | `2e49de9` | found by syslogd's pid file; `needs-syscall-smoke` |
+| Step 5: `lib/libsyslog`, syslogd, logger, newsyslog, `etc/` files, rc.d, six manual pages | `9056be8` | `syslog_syscall_smoke` (36 checks); 37 host tests; regression set passes |
+
 Next free syscall number: **584**.
 
 ## Order
@@ -38,10 +41,10 @@ Next free syscall number: **584**.
 |---|---|---|
 | 1 | Sockets stage 3: local sockets | done |
 | 2 | Sockets stage 4: descriptor and credential passing | done |
-| 3 | Sockets stage 5: manual pages; `UNIX.md` marked implemented | **next** |
+| 3 | Sockets stage 5: manual pages; `UNIX.md` marked implemented | done |
 | 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | done |
-| 5 | syslogd, logger, newsyslog (without TLS) | to do |
-| 6 | OpenSSL 3, then syslog over TCP and TLS | to do |
+| 5 | syslogd, logger, newsyslog (without TLS) | done |
+| 6 | OpenSSL 3, then syslog over TCP and TLS | **next** (or 7/8) |
 | 7 | cron, crontab, periodic | to do |
 | 8 | Time zones | to do |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
@@ -73,7 +76,7 @@ descriptors in the message. `gc` also runs when a descriptor of an in-flight des
 closed (a socket sent over itself is never destroyed otherwise). Once a socket's own descriptors
 are gone nobody can read its queue, so it's garbage even while its peer is open.
 
-## 3. Sockets stage 5: manual pages
+## 3. Sockets stage 5: manual pages — done (`60d0b7f`)
 
 mdoc pages in `share/man` (lint clean with `oxdoc -T lint`): `unix.4`, `socket.2`, `sendmsg.2`
 (and `send`/`sendto` links), `recvmsg.2`, `getsockopt.2`, `getpeereid.3`, `accept.2`, `bind.2`,
@@ -96,7 +99,26 @@ step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`) went in with sockets stage 4 (m
 §3.6 is a MAY; add it when a module has something to export, `vfs.oxfs` first). `/proc/meminfo`
 still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
 
-## 5. syslogd, logger, newsyslog (`SYSLOG.md`, without §8.3-8.4); dmesg is done
+## 5. syslogd, logger, newsyslog — done (`9056be8`)
+
+As planned, with these details settled in the code (and in the manual pages):
+- Messages from this host (`/dev/log`, `/dev/klog`) are stamped on receipt; musl's `syslog(3)`
+  stamps in UTC. Network messages keep their stamp unless `-T`.
+- A tagged local message without `[pid]` gets the sender's from `LOCAL_CREDS_PERSISTENT`
+  (`SCM_CREDS2`). Repeat suppression therefore only collapses repeats from one process.
+- The pid file is `flock`ed (FreeBSD's `pidfile_open`): a second syslogd exits instead of
+  rebinding `/dev/log`. Marks bypass repeat suppression. `#-host` isn't a block (a `#----` banner
+  would be).
+- logger's local path is `syslog(3)` (as FreeBSD's), so the smoke test covers it.
+- newsyslog stamps the newest archive's mtime at rotation and reads it back next run; size,
+  interval and time conditions are OR'd.
+- rcorder now orders `... NETWORKING newsyslog syslogd SERVERS ...`.
+
+Left over: `re_format(7)`, `utmpx(5)` and `syslog(3)` pages, referenced but not written. oxdoc bugs
+found while writing pages: `.Op` inside `.Oo`/`.Oc` on an `.It` line swallows the item's body;
+`dmesg.8`'s `.Sm off`/`.Ql` idiom renders wrong; lint doesn't flag an unknown `.St`.
+
+The original plan:
 
 - `usr.sbin/syslogd` (Rust std): `syslog.conf` parser (FreeBSD format, `include`, blocks,
   NetBSD-style `name=value` options), inputs `/dev/log` (local datagram), `/dev/klog`, UDP 514;
@@ -215,6 +237,9 @@ possible without the gateway); `/sbin/initconf`; `daemon(8)` for `<name>_restart
   number: it logs `unrecognized syscall number N`, once per number.
 - `poll`/`select`/`ppoll` are registered by the `socket` module: a test that polls anything (a
   pipe, `/dev/klog`) must load it, or `poll` is `ENOSYS`.
+- oxfs buffers writes per descriptor; since `2e49de9` a lookup, open or read through another
+  descriptor commits them first. A new path into file contents that bypasses those three (a new
+  syscall reading an inode directly) must call `force_commit_pending_writes` too.
 - **Every syscall-reachable change gets a test first-run before believing it**: this session's own
   test expectations were wrong four times (two gc cases, a control-buffer size, a weekday) and the
   kernel right; and the kernel was wrong once (an overflow in `kern.msgbuf`'s read, a kernel panic
