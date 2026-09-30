@@ -1,6 +1,6 @@
 # OxideBSD system logging: design specification
 
-Status: **accepted design, partly implemented** (not yet: TCP and TLS, §§8.3-8.5, which wait for OpenSSL). Target release: v0.3.0.
+Status: **implemented** (TCP and TLS, §§8.3-8.5, in 2026-09-30). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `syslogd(8)`, `syslog.conf(5)`,

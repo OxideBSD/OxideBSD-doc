@@ -11,7 +11,9 @@ Last updated 2026-09-29, end of the session that did sockets stage 5 and step 5.
 ## Where things stand
 
 Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
-`2e49de9`, `9056be8`; not yet pushed). **Next: step 6 (OpenSSL, then syslog over TCP and TLS) or step 7 (cron).** Nothing is in flight. The website has `robots.txt`
+`2e49de9`, `9056be8`). Step 6 is done too (OpenSSL, the trust store, dynamic Rust programs,
+loopback, syslog over TCP and TLS, through `b07c19d`). **Next: step 7 (cron).** Nothing is in
+flight. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
 
@@ -46,7 +48,7 @@ Next free syscall number: **584**.
 | 3 | Sockets stage 5: manual pages; `UNIX.md` marked implemented | done |
 | 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | done |
 | 5 | syslogd, logger, newsyslog (without TLS) | done |
-| 6 | OpenSSL 3, then syslog over TCP and TLS | **next** (or 7/8) |
+| 6 | OpenSSL 3, then syslog over TCP and TLS | done (`b07c19d`) |
 | 7 | cron, crontab, periodic | to do |
 | 8 | Time zones | done |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
@@ -147,7 +149,7 @@ The original plan:
   legacy provider as a `dlopen`ed module, a PIE `/usr/bin/openssl`, static archives too. Needed
   first: biased load of dynamically linked PIEs (`f9fb253`), one musl build for `libc.a` and
   `libc.so` (`e40cc9f`), file `mmap` at a nonzero offset and the oxfs `shm` inode flag (`026e9ba`).
-  `tests/openssl_syscall_smoke.rs` covers it. Still to do in this step: syslogd over TCP/TLS.
+  `tests/openssl_syscall_smoke.rs` covers it.
 - `regress/openssl-syscall-smoke`: KATs (SHA-256, AES-GCM, RSA/ECDSA, `RAND_bytes`) and a TLS 1.3
   handshake over an in-process memory BIO pair (no loopback, no Perl on target).
 - Trust store: vendor Mozilla NSS `certdata.txt` (MPL-2.0), split at build time into
@@ -175,6 +177,8 @@ The original plan:
   existing single `poll(2)` loop, as the BSDs do (non-blocking sockets, OpenSSL's
   `WANT_READ`/`WANT_WRITE`), no threads; and **a loopback interface first** (`lo0`,
   `127.0.0.0/8`), so the on-target test runs two syslogds on one machine.
+  **Done (`b07c19d`)**: `usr.sbin/syslogd/src/net.rs`; host tests of two syslogds (TCP, queue and
+  reconnect, TLS with a test CA, a pinned fingerprint, rejections), and on target over lo0.
 - Loopback plan: a small BSD-style interface layer (`sys/net/if.rs`): `lo0` (127.0.0.1/8) and
   `re0` (the rtl8139, 10.0.2.15/24), a route lookup (loopback for 127/8 and our own addresses,
   the connected subnet, the default gateway) that picks the interface, next hop and source
