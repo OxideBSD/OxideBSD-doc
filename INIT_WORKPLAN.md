@@ -162,9 +162,9 @@ The original plan:
 As planned. Settled in the code: zic/zdump are static at fixed bases (`0x11000000`,
 `0x12000000`), since musl's `libc.a` isn't PIC and static PIE for C would need a musl rebuild;
 zdump links tzcode's own `localtime.c` (musl has no `tzalloc`/`localtime_rz`). tzsetup's menus
-show each zone as `City (Country: comment)`. musl caches the zone by the `TZ` string, so a
-program re-reading it (`syslog::time::reload_zone`, and cron's later) flips `TZ` for one
-`tzset(3)`. cron's `SIGHUP` reload waits for cron.
+show each zone as `City (Country: comment)`. Since the musl batch after it (below), zic, zdump
+and the C fixtures are static PIE, and running programs follow a changed `/etc/localtime` by
+themselves (§5.4 rewritten), so no program reloads the zone on `SIGHUP`.
 
 The original plan:
 
@@ -173,7 +173,7 @@ The original plan:
   (Rust).
 - oxfs's inode count is no longer fixed (`475e995`, `13113f8`), so the zones' ~600 files need
   no layout change.
-- syslogd and cron re-read the zone on `SIGHUP`.
+- Running programs follow a changed zone (TIMEZONE.md §5.4, the musl batch).
 - Test: `tz_syscall_smoke`.
 
 ## 9. BusyBox roster cut
