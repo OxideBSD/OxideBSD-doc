@@ -1,6 +1,6 @@
 # OxideBSD device filesystem: design specification
 
-Status: **accepted design, not yet implemented.** Target release: v0.3.0.
+Status: **accepted design, implemented** (2026-09-30). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `devfs(4)` and `devfs.conf(5)`; this
@@ -71,8 +71,10 @@ nodes for new entries and removes nodes of removed ones before the lookup contin
 1. `unlink(2)` of a device node hides it; §4.3 does not bring it back. A reboot does.
 2. `chmod(2)` and `chown(2)` of a node last until reboot (§5 makes such changes permanent).
 3. `mknod(2)` in devfs fails with `EPERM`: devices come from drivers.
-4. Other files can be created in devfs and last until reboot: sockets (`/dev/log`, bound by
-   `syslogd`), symbolic links, directories, and ordinary files (under `/dev/shm`).
+4. Other files can be created anywhere in devfs and last until reboot: sockets (`/dev/log`,
+   bound by `syslogd`), FIFOs, symbolic links, directories and ordinary files (`/dev/shm`'s).
+5. devfs remembers up to 64 removed nodes; past that, a removed node can come back the next time
+   the registry changes.
 
 4.5. `mknod(2)` elsewhere in oxfs still creates device nodes on disk, which open through the
 registry by number like devfs's.
