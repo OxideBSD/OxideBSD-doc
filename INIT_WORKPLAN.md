@@ -11,7 +11,7 @@ Last updated 2026-09-29, end of the session that did sockets stage 5 and step 5.
 ## Where things stand
 
 Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
-`2e49de9`, `9056be8`; not yet pushed). **Next: step 8 (time zones)**, then 6 or 7. Nothing is in flight. The website has `robots.txt`
+`2e49de9`, `9056be8`; not yet pushed). **Next: step 6 (OpenSSL, then syslog over TCP and TLS) or step 7 (cron).** Nothing is in flight. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
 
@@ -33,6 +33,7 @@ Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `6
 | Step 5: `lib/libsyslog`, syslogd, logger, newsyslog, `etc/` files, rc.d, six manual pages | `9056be8` | `syslog_syscall_smoke` (36 checks); 37 host tests; regression set passes |
 | oxfs: dynamic inode tables (inode file per pool, `SUPERBLOCK_VERSION` 4) | `475e995` | 5821 inodes after seeding; remount checked by hand |
 | oxfs: inodes and blocks freed when nothing refers to them (`oxidebsd_inode_in_use`, orphans, mount sweep) | `13113f8` | `needs-syscall-smoke`; POSIX canary identical |
+| Step 8: tz 2026d vendored, `/usr/share/zoneinfo`, zic, zdump, tzsetup, syslogd zone reload | `58a2945`, `ad62ef1` | `tz_syscall_smoke` (34 checks) |
 
 Next free syscall number: **584**.
 
@@ -47,7 +48,7 @@ Next free syscall number: **584**.
 | 5 | syslogd, logger, newsyslog (without TLS) | done |
 | 6 | OpenSSL 3, then syslog over TCP and TLS | **next** (or 7/8) |
 | 7 | cron, crontab, periodic | to do |
-| 8 | Time zones | to do |
+| 8 | Time zones | done |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
 | 10 | `/sbin/init` (init's step 3) | to do |
 | — | After step 3: netif ioctls, loopback, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
@@ -156,7 +157,16 @@ The original plan:
   `etc/crontab`, `etc/rc.d/cron`.
 - Tests: host tests with an injected clock; `cron_syscall_smoke` (`CRON.md` §9.2).
 
-## 8. Time zones (`TIMEZONE.md`)
+## 8. Time zones — done (`ad62ef1`)
+
+As planned. Settled in the code: zic/zdump are static at fixed bases (`0x11000000`,
+`0x12000000`), since musl's `libc.a` isn't PIC and static PIE for C would need a musl rebuild;
+zdump links tzcode's own `localtime.c` (musl has no `tzalloc`/`localtime_rz`). tzsetup's menus
+show each zone as `City (Country: comment)`. musl caches the zone by the `TZ` string, so a
+program re-reading it (`syslog::time::reload_zone`, and cron's later) flips `TZ` for one
+`tzset(3)`. cron's `SIGHUP` reload waits for cron.
+
+The original plan:
 
 - Vendor IANA tzdata + tzcode at `external/public-domain/tz`; build `zic` for the host, compile
   the zones, seed `/usr/share/zoneinfo`; build `zic`/`zdump` for the target; `usr.sbin/tzsetup`

@@ -1,6 +1,6 @@
 # OxideBSD time zones: design specification
 
-Status: **accepted design, not yet implemented.** Target release: v0.3.0.
+Status: **accepted design, implemented** (2026-09-29; cron's reload on `SIGHUP`, §5.4, comes with cron). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `tzfile(5)`, `zic(8)`, `zdump(8)`,
