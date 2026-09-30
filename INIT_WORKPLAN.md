@@ -143,6 +143,12 @@ The original plan:
   `/usr/bin/openssl` and `/etc/ssl/openssl.cnf`. Stamp it like the LLVM builds.
 - asm on. The kernel saves only FXSAVE state (no XSAVE), so OpenSSL's OSXSAVE check must keep it
   off AVX; the smoke test confirms that.
+- **Done (`d2551f6`)**, dynamically linked rather than static: `libcrypto.so.3`/`libssl.so.3`, the
+  legacy provider as a `dlopen`ed module, a PIE `/usr/bin/openssl`, static archives too. Needed
+  first: biased load of dynamically linked PIEs (`f9fb253`), one musl build for `libc.a` and
+  `libc.so` (`e40cc9f`), file `mmap` at a nonzero offset and the oxfs `shm` inode flag (`026e9ba`).
+  `tests/openssl_syscall_smoke.rs` covers it. Still to do in this step: the trust store and
+  certctl, `openssl-sys`, syslogd over TCP/TLS.
 - `regress/openssl-syscall-smoke`: KATs (SHA-256, AES-GCM, RSA/ECDSA, `RAND_bytes`) and a TLS 1.3
   handshake over an in-process memory BIO pair (no loopback, no Perl on target).
 - Trust store: vendor Mozilla NSS `certdata.txt` (MPL-2.0), split at build time into
