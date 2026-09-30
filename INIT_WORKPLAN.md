@@ -104,8 +104,8 @@ still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
 As planned, with these details settled in the code (and in the manual pages):
 - Messages from this host (`/dev/log`, `/dev/klog`) are stamped on receipt; musl's `syslog(3)`
   stamps in UTC. Network messages keep their stamp unless `-T`.
-- A tagged local message without `[pid]` gets the sender's from `LOCAL_CREDS_PERSISTENT`
-  (`SCM_CREDS2`). Repeat suppression therefore only collapses repeats from one process.
+- Local messages are logged exactly as sent: no pid is added from the sender's credentials
+  (decided by the owner; `LOCAL_CREDS` isn't used).
 - The pid file is `flock`ed (FreeBSD's `pidfile_open`): a second syslogd exits instead of
   rebinding `/dev/log`. Marks bypass repeat suppression. `#-host` isn't a block (a `#----` banner
   would be).
