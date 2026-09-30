@@ -175,6 +175,14 @@ The original plan:
   existing single `poll(2)` loop, as the BSDs do (non-blocking sockets, OpenSSL's
   `WANT_READ`/`WANT_WRITE`), no threads; and **a loopback interface first** (`lo0`,
   `127.0.0.0/8`), so the on-target test runs two syslogds on one machine.
+- Loopback plan: a small BSD-style interface layer (`sys/net/if.rs`): `lo0` (127.0.0.1/8) and
+  `re0` (the rtl8139, 10.0.2.15/24), a route lookup (loopback for 127/8 and our own addresses,
+  the connected subnet, the default gateway) that picks the interface, next hop and source
+  address; `sys/net/if_loop.rs` queues looped packets, drained by `net::poll` with the waiters
+  woken as the NIC's interrupt does. Sockets gain a real local address: `bind` to a local address
+  or `INADDR_ANY` (else `EADDRNOTAVAIL`), TCP demultiplexes on the full 4-tuple, a listener bound
+  to 127.0.0.1 only hears loopback, `getsockname` reports the real address. IPv4 drops
+  127/8 arriving on re0. `/etc/hosts` with `localhost`. No interface ioctls yet (ifconfig later).
 - Open: `SYSLOG.md` §13 (beyond the trust store above).
 
 ## 7. cron, crontab, periodic (`CRON.md`)
