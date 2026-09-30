@@ -183,6 +183,8 @@ The original plan:
   or `INADDR_ANY` (else `EADDRNOTAVAIL`), TCP demultiplexes on the full 4-tuple, a listener bound
   to 127.0.0.1 only hears loopback, `getsockname` reports the real address. IPv4 drops
   127/8 arriving on re0. `/etc/hosts` with `localhost`. No interface ioctls yet (ifconfig later).
+  **Done (`c22d920`)**; the Ethernet interface is `rl0` (FreeBSD's name for the rtl8139). Also
+  fixed there: TCP dropped data still buffered at `close()`.
 - Open: `SYSLOG.md` §13 (beyond the trust store above).
 
 ## 7. cron, crontab, periodic (`CRON.md`)
