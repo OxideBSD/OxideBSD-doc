@@ -6,14 +6,15 @@ decisions already taken, the traps already found, and how each part is verified.
 `UNIX.md`, `SYSCTL.md`, `SYSLOG.md`, `CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md`
 and `TTY.md`; this file doesn't repeat it. Update it as parts land.
 
-Last updated 2026-09-29, end of the session that did sockets stage 5 and step 5.
+Last updated 2026-09-30, in the session that did cron stage 1 and init's first cut.
 
 ## Where things stand
 
 Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
 `2e49de9`, `9056be8`). Step 6 is done too (OpenSSL, the trust store, dynamic Rust programs,
-loopback, syslog over TCP and TLS, through `b07c19d`). **Next: step 7 (cron).** Nothing is in
-flight. The website has `robots.txt`
+loopback, syslog over TCP and TLS, through `b07c19d`). **In progress: step 7 (cron)**, stage 1
+of 4 done (`lib/libcron`, `6dc085d`). A first cut of `/sbin/init` landed ahead of step 10
+(`52656de`), so `/etc/rc` now runs at boot. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
 
@@ -49,10 +50,10 @@ Next free syscall number: **584**.
 | 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | done |
 | 5 | syslogd, logger, newsyslog (without TLS) | done |
 | 6 | OpenSSL 3, then syslog over TCP and TLS | done (`b07c19d`) |
-| 7 | cron, crontab, periodic | to do |
+| 7 | cron, crontab, periodic | in progress (stage 1 of 4) |
 | 8 | Time zones | done |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
-| 10 | `/sbin/init` (init's step 3) | to do |
+| 10 | `/sbin/init` (init's step 3) | first cut done (`52656de`) |
 | — | After step 3: netif ioctls, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
 
 Steps 4, 7 and 8 don't depend on the socket work and may move earlier. syslogd (5) needs local
@@ -193,6 +194,18 @@ The original plan:
 
 ## 7. cron, crontab, periodic (`CRON.md`)
 
+Four stages, each committed and pushed as it lands:
+1. **Done (`6dc085d`)**: `lib/libcron`, the table parser and Vixie cron 4's clock handling as a
+   pure state machine; 13 host tests. `-o` (default, as FreeBSD) counts minutes in UTC, `-s` in
+   local time, which makes a daylight-saving change a clock jump (§4.5). A field beginning with
+   `*` counts as unrestricted for the day rule (Vixie); `n/step` means `n-max/step`.
+2. The daemon, with login's `apply_class` moved into `lib/liblogincap` as `setusercontext`
+   (flags as the BSDs'); `rc.d/cron`, `etc/crontab`, `etc/pam.d/cron`.
+3. `crontab(1)` and `cron_syscall_smoke`.
+4. `periodic` and its scripts, `periodic.conf`, the manual pages, `CRON.md` marked implemented.
+
+The original plan:
+
 - A shared table parser (a small library crate) used by both programs.
 - `usr.sbin/cron` (Rust std): tables, `cron.d`, reload by mtime, jitter, `@reboot` via
   `/var/run/cron.reboot`, clock-change handling, login class and PAM service `cron`
@@ -228,6 +241,18 @@ exist. Editing `build_busybox.rs` costs a ~30-minute BusyBox rebuild: make all f
 one edit, together with any other pending roster change.
 
 ## 10. `/sbin/init` (`INIT.md`, step 3)
+
+**First cut (`52656de`)**, asked for ahead of the rest: `sbin/init` runs `/etc/rc`, then a root
+shell on the console, restarted when it exits (3 exits within 5 s pause 30 s); reaps orphans;
+`-s` and `-R` skip rc; `SIGINT`/`SIGUSR1`/`SIGUSR2` do §10's shutdown (hang up the console
+session first, so `rc.shutdown` can take the console). The kernel embeds it (static PIE) and
+starts it without a controlling terminal (`InitProgram::console`); falls back to `/bin/sh` if it
+can't be started. What follows is what's left; the shell loop becomes the ttys/getty loop.
+
+Found on the way: **`poweroff` doesn't power QEMU off.** Init reaches `reboot(2)` with
+`RB_POWER_OFF`, and `sys/reboot.rs`'s `poweroff()` writes `0x2000` to port `0x604`, which has
+no effect under the default UEFI boot, then halts. It should take the port from the ACPI FADT
+(`PM1a_CNT_BLK`) and `SLP_TYPa` from the DSDT's `\_S5`.
 
 - `sbin/init` (Rust std): the states of `INIT.md` §3, `/etc/ttys` sessions with restart limits
   (FreeBSD's: 3 deaths within 5 s of start → 30 s pause, logged), the signal table (§6), reaping,
