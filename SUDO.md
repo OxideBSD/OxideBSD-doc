@@ -1,4 +1,4 @@
-# OxideBSD privilege escalation: sudo-rs
+# OxideBSD privilege escalation: sudo-rs — design specification
 
 Status: **accepted plan, not yet implemented.** Target release: v0.3.0.
 

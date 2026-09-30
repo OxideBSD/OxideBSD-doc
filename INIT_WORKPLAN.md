@@ -53,7 +53,7 @@ Next free syscall number: **584**.
 | 8 | Time zones | done |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
 | 10 | `/sbin/init` (init's step 3) | to do |
-| — | After step 3: netif ioctls, loopback, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
+| — | After step 3: netif ioctls, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
 
 Steps 4, 7 and 8 don't depend on the socket work and may move earlier. syslogd (5) needs local
 datagram sockets (1). init (10) needs syslog (5) and uses sysctl (4).
@@ -243,9 +243,8 @@ one edit, together with any other pending roster change.
 
 ## After step 3
 
-Interface configuration ioctls and `rc.d/netif`; a loopback interface (would make network tests
-possible without the gateway); `/sbin/initconf`; `daemon(8)` for `<name>_restart`; the
-`LOGIN.md` leftovers (`tty01` serial tests, `who`).
+Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` for
+`<name>_restart`; the `LOGIN.md` leftovers (`tty01` serial tests, `who`).
 
 ## Traps and methods
 
