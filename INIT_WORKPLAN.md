@@ -159,6 +159,12 @@ The original plan:
   Rust, OpenSSL's subject hash reimplemented and checked against the host's `openssl`), shared by
   `certctl` and `build.rs`, which seeds `/etc/ssl` at build time. Distrust-after dates aren't
   enforced (as FreeBSD).
+- **Before `openssl-sys`: Rust programs become dynamic PIEs** (decided 2026-09-30), so they link
+  `libssl.so.3` like `/usr/bin/openssl`. `x86_64-unknown-oxidebsd`: `crt-static-default` off, PIE
+  on. The unwinder is `/lib/libgcc_s.so.1` built from LLVM libunwind (+ compiler-rt builtins), as
+  on FreeBSD. pid 1 (`/sbin/init_sh`) stays a static PIE (FreeBSD's `NO_SHARED` init), everything
+  else dynamic. Shared libraries `/bin` and `/sbin` need move to `/lib`: `/lib/libc.so` (the real
+  file, `ld-musl-x86_64.so.1` beside it), `/lib/libgcc_s.so.1`; `/usr/lib/libc.so` a symlink.
 - Rust binding for syslogd: the `openssl` crate against the sysroot (`OPENSSL_DIR`,
   `OPENSSL_STATIC`); `openssl-sys`'s build script may need the `oxidebsd` target added (the libc
   crate fork shows how).
