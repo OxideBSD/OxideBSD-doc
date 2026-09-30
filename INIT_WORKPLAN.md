@@ -147,8 +147,7 @@ The original plan:
   legacy provider as a `dlopen`ed module, a PIE `/usr/bin/openssl`, static archives too. Needed
   first: biased load of dynamically linked PIEs (`f9fb253`), one musl build for `libc.a` and
   `libc.so` (`e40cc9f`), file `mmap` at a nonzero offset and the oxfs `shm` inode flag (`026e9ba`).
-  `tests/openssl_syscall_smoke.rs` covers it. Still to do in this step: `openssl-sys`, syslogd
-  over TCP/TLS.
+  `tests/openssl_syscall_smoke.rs` covers it. Still to do in this step: syslogd over TCP/TLS.
 - `regress/openssl-syscall-smoke`: KATs (SHA-256, AES-GCM, RSA/ECDSA, `RAND_bytes`) and a TLS 1.3
   handshake over an in-process memory BIO pair (no loopback, no Perl on target).
 - Trust store: vendor Mozilla NSS `certdata.txt` (MPL-2.0), split at build time into
@@ -168,9 +167,9 @@ The original plan:
   **Done (`a9b8d5b`, `ab98faf`)**. pid 1 is `/bin/sh` (kernel-embedded), so it and
   `/sbin/emergency` are the static ones; `init_sh` is dynamic. Needed `--eh-frame-hdr` in
   musl-gcc (musl `27a3d66f`) for unwinding through shared libraries.
-- Rust binding for syslogd: the `openssl` crate against the sysroot (`OPENSSL_DIR`,
-  `OPENSSL_STATIC`); `openssl-sys`'s build script may need the `oxidebsd` target added (the libc
-  crate fork shows how).
+- Rust binding for syslogd: the `openssl` crate against the sysroot. **Done (`d346cb0`)**:
+  `openssl-sys` needs no patch, just `OPENSSL_DIR` and `CC_x86_64_unknown_oxidebsd`; it links the
+  shared libraries. `regress/std/openssl-rs-smoke` covers it (TLS 1.3 over a `UnixStream` pair).
 - syslogd: RFC 6587 framing, `@@host`, `tcp_server`; RFC 5425 with `@[host]:port(...)`, the
   `tls_*` options, verification, queueing and reconnect (§8.5).
 - Open: `SYSLOG.md` §13 (beyond the trust store above).
