@@ -260,10 +260,8 @@ session first, so `rc.shutdown` can take the console). The kernel embeds it (sta
 starts it without a controlling terminal (`InitProgram::console`); falls back to `/bin/sh` if it
 can't be started. What follows is what's left; the shell loop becomes the ttys/getty loop.
 
-Found on the way: **`poweroff` doesn't power QEMU off.** Init reaches `reboot(2)` with
-`RB_POWER_OFF`, and `sys/reboot.rs`'s `poweroff()` writes `0x2000` to port `0x604`, which has
-no effect under the default UEFI boot, then halts. It should take the port from the ACPI FADT
-(`PM1a_CNT_BLK`) and `SLP_TYPa` from the DSDT's `\_S5`.
+Found on the way and fixed (`poweroff` commit after `98cf1fc`): `poweroff` wrote PM1a control at
+SeaBIOS's port `0x604`, but OVMF's is `0xb004`; `sys/acpi.rs` now reads the FADT and `\_S5`.
 
 - `sbin/init` (Rust std): the states of `INIT.md` §3, `/etc/ttys` sessions with restart limits
   (FreeBSD's: 3 deaths within 5 s of start → 30 s pause, logged), the signal table (§6), reaping,
