@@ -50,6 +50,13 @@ Kept although not BSD-base, as the only tool of their kind until a native one ex
 sudo-rs), `nslookup`, `ftpget`, `ftpput`. Still BusyBox and due for native rewrites: 26 in
 `/bin` (`ash` stays for `configure`) and 4 in `/sbin`; see `INIT_WORKPLAN.md`.
 
+## Since the third cut
+
+- 2026-09-30 (`bc401ba`): `sleep`, `sync`, `link`, `unlink`, `rmdir`, `nproc`, `kill`, `test`,
+  `chmod` rewritten in Rust and removed.
+- 2026-10-01: `mount` and `umount` removed; native ones in `/sbin` (`8a7d30a`) over `nmount(2)`,
+  which musl's `mount(3)` now uses too. **128 BusyBox applets remain.**
+
 ## Build succeeded: 287 applets (229 kept in the roster -- see "Removed before v0.1" below)
 
 **Pre-v0.1 roster cleanup**: 58 of these 287 built cleanly but their core function structurally

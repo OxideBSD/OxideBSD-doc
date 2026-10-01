@@ -286,7 +286,8 @@ SeaBIOS's port `0x604`, but OVMF's is `0xb004`; `sys/acpi.rs` now reads the FADT
   (`[`) `chmod`, and `mount`/`umount` over the new `nmount(2)` (584) with `/etc/fstab` and
   `rc.d/mountcritlocal`. Still BusyBox in `/bin` (17): `ash` (stays for `configure`), `date stty dd
   df expr pgrep pkill`, `grep egrep fgrep sed ed` (regex library first), `tar gzip gunzip zcat`;
-  in `/sbin`: `mknod ping` (and `mount umount` until the next BusyBox rebuild).
+  in `/sbin`: `mknod ping`. BusyBox's `mount`/`umount` left the roster with musl's `nmount()`
+  (2026-10-01), on which musl's `mount(3)` is now built; syscalls 174/175 are gone.
 
 ## Found 2026-09-30, not yet fixed
 
