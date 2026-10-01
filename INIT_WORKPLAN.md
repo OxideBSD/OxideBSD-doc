@@ -272,6 +272,17 @@ no effect under the default UEFI boot, then halts. It should take the port from 
 - Tests: boot to a getty; `SIGTERM` to single-user; `rc` failure to single-user; respawn in
   recovery mode (extend `init_respawn_smoke`); shutdown paths by hand (they end the VM).
 
+## Side work done 2026-09-30
+
+- oxfs: a new entry takes its directory's group (BSD rule) and directories' times move on
+  create/remove (`113d7d9`, `0d0fbbb`).
+- `/bin` and `/sbin` are statically linked, OpenBSD-style (`33a69e6`); `/sbin/nologin` added.
+  Still missing from a BSD `/sbin`: `ifconfig`/`route` (below), `newfs`/`fsck` (oxfs tools),
+  module load/unload tools, `swapon`/`savecore`/`dumpon` (need swap and crash dumps first).
+- Still BusyBox in `/bin` (27): `ash hush` (retire), `sleep sync link unlink rmdir nproc kill test
+  chmod`, `date stty dd df expr pgrep pkill`, `grep egrep fgrep sed ed` (regex library first),
+  `tar gzip gunzip zcat`; in `/sbin` (4): `mount umount mknod ping`. Rewrites are Rust std.
+
 ## After step 3
 
 Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` for
