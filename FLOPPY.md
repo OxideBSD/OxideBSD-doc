@@ -146,7 +146,33 @@ signed with Ed25519 (`signify` format), and the release's public key is in the i
 Ed25519 verifier and SHA-256 are a few kilobytes. A set whose sum doesn't match MUST NOT be
 extracted.
 
-## 7. Budget
+## 7. Modern hardware
+
+7.1. **USB floppy drives.** A USB floppy drive is a mass-storage device of subclass UFI, which
+UEFI firmware built on EDK2 supports, as it supports FAT12. On removable media without a
+partition table, UEFI treats the whole device as one volume and runs
+`\EFI\BOOT\BOOTX64.EFI` from it (§2.4). Because the UEFI loader reads the payload through the
+firmware's `SimpleFileSystem` and the kernel never touches the medium after
+`ExitBootServices` (§3.4), OxideBSD needs no USB floppy driver of its own. Some firmware hides
+the drive outside its one-time boot menu. A USB floppy reads at roughly 30-60 KB/s, so the
+payload loads in 10-20 seconds.
+
+7.2. **Secure Boot.** An unsigned `BOOTX64.EFI` does not run while Secure Boot is on; the user
+turns it off. Signed boot (a `shim` and a vendor certificate) is outside this specification.
+
+7.3. **Drivers the installer needs there.** On machines of the last decade the installer finds
+nothing to install to and nothing to download through unless OxideBSD has, besides those of
+§6.2:
+- **NVMe** and **AHCI** (SATA) for the target disk; OxideBSD has virtio-blk and IDE only;
+- network drivers for the common on-board chips (Intel I219/I225, Realtek RTL8111/8125), not
+  only e1000 and virtio-net.
+
+The xHCI keyboard driver and the GOP framebuffer already cover input and display.
+
+7.4. QEMU cannot emulate a USB UFI drive. The partitionless-FAT path is tested with the image as
+a USB stick under OVMF (§9.1); the USB floppy path itself only on real hardware.
+
+## 8. Budget
 
 Measured on 2026-09-30 builds where marked; the rest are estimates.
 
@@ -162,18 +188,18 @@ Measured on 2026-09-30 builds where marked; the rest are estimates.
 
 The room left is for network drivers. For comparison, Limine's BIOS stage alone is 331 KB.
 
-## 8. Verification
+## 9. Verification
 
-8.1. QEMU, all four ways in: `-fda` with SeaBIOS; `-cdrom` with SeaBIOS (El Torito floppy
+9.1. QEMU, all four ways in: `-fda` with SeaBIOS; `-cdrom` with SeaBIOS (El Torito floppy
 emulation); `-cdrom` with OVMF (El Torito EFI); and the raw image as a USB disk with OVMF.
 
-8.2. A test MUST fail the build if `BOOTX64.EFI` exceeds 4,096 bytes or the image exceeds
+9.2. A test MUST fail the build if `BOOTX64.EFI` exceeds 4,096 bytes or the image exceeds
 1,474,560 bytes.
 
-8.3. An install into a blank QEMU disk from a local HTTP mirror, followed by a boot of the
+9.3. An install into a blank QEMU disk from a local HTTP mirror, followed by a boot of the
 installed system.
 
-## 9. Open questions
+## 10. Open questions
 
 1. PXE: Limine's PXE stage is 23 KB; the same payload booted over the network would be a
    netinstall for machines without a floppy or CD drive. Use Limine there, or a native PXE
