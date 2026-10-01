@@ -288,6 +288,18 @@ SeaBIOS's port `0x604`, but OVMF's is `0xb004`; `sys/acpi.rs` now reads the FADT
   df expr pgrep pkill`, `grep egrep fgrep sed ed` (regex library first), `tar gzip gunzip zcat`;
   in `/sbin`: `mknod ping` (and `mount umount` until the next BusyBox rebuild).
 
+## Found 2026-09-30, not yet fixed
+
+- **`execve` reads the executable 512 bytes per `read`** (`lifecycle::read_fd_to_end_and_close`,
+  through `exec_image`), so exec of a large program (clang, ld.lld: tens to hundreds of MB) costs
+  hundreds of thousands of system calls. bmake's `configure` on target takes ~14 minutes for this
+  reason (4 s on the host). Fix first: read in large chunks or map the file.
+- `wget` over TCP is slow (stop-and-wait); a 4 MB download takes minutes. BusyBox `tar` has no
+  gzip support (`tar xzf` fails; `gunzip -c | tar xf -` works) -- matters for the floppy plan's
+  `.tgz` sets, and for the native `tar`.
+- `/bin/sh` runs autoconf `configure` (bmake on target; bmake, nano, ncurses on the host identical
+  to dash), so `ash` is no longer needed for that.
+
 ## After step 3
 
 Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` for
