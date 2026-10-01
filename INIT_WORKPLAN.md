@@ -12,8 +12,8 @@ Last updated 2026-09-30, in the session that did cron stage 1 and init's first c
 
 Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
 `2e49de9`, `9056be8`). Step 6 is done too (OpenSSL, the trust store, dynamic Rust programs,
-loopback, syslog over TCP and TLS, through `b07c19d`). **In progress: step 7 (cron)**, stage 1
-of 4 done (`lib/libcron`, `6dc085d`). A first cut of `/sbin/init` landed ahead of step 10
+loopback, syslog over TCP and TLS, through `b07c19d`). **In progress: step 7 (cron)**, stages 1
+and 2 of 4 done (`lib/libcron` `6dc085d`, the daemon `dc01885`). A first cut of `/sbin/init` landed ahead of step 10
 (`52656de`), so `/etc/rc` now runs at boot. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
@@ -50,7 +50,7 @@ Next free syscall number: **584**.
 | 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | done |
 | 5 | syslogd, logger, newsyslog (without TLS) | done |
 | 6 | OpenSSL 3, then syslog over TCP and TLS | done (`b07c19d`) |
-| 7 | cron, crontab, periodic | in progress (stage 1 of 4) |
+| 7 | cron, crontab, periodic | in progress (stage 2 of 4 done) |
 | 8 | Time zones | done |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
 | 10 | `/sbin/init` (init's step 3) | first cut done (`52656de`) |
@@ -199,8 +199,14 @@ Four stages, each committed and pushed as it lands:
    pure state machine; 13 host tests. `-o` (default, as FreeBSD) counts minutes in UTC, `-s` in
    local time, which makes a daylight-saving change a clock jump (§4.5). A field beginning with
    `*` counts as unrestricted for the day rule (Vixie); `n/step` means `n-max/step`.
-2. The daemon, with login's `apply_class` moved into `lib/liblogincap` as `setusercontext`
-   (flags as the BSDs'); `rc.d/cron`, `etc/crontab`, `etc/pam.d/cron`.
+2. **Done (`dc01885`)**: the daemon; login's class code moved into `lib/liblogincap` as
+   `setusercontext` (FreeBSD's flags; `PATH` and the class environment are returned, not set);
+   `rc.d/cron`, `etc/crontab` (newsyslog only until stage 4), `etc/pam.d/cron`. Host tests need
+   `OXIDEBSD_LIBPAM_DIR=<repo>/target/openpam` (OpenPAM is static). Found on the way and fixed
+   (`0d0fbbb`): oxfs never updated a directory's times when an entry was added or removed, so
+   cron never noticed a new `cron.d` table. Found and **not** fixed: a file made by
+   `open(O_CREAT)` always gets gid 0 (only the uid is recorded), while mkdir/mknod/symlink use
+   the creator's gid.
 3. `crontab(1)` and `cron_syscall_smoke`.
 4. `periodic` and its scripts, `periodic.conf`, the manual pages, `CRON.md` marked implemented.
 
