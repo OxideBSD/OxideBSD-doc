@@ -1,6 +1,6 @@
 # OxideBSD read-only page cache: design specification
 
-Status: **accepted design, not yet implemented** (2026-09-30). Target release: v0.3.0.
+Status: **implemented** (2026-10-01, `sys/memory/pagecache.rs`). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -30,8 +30,13 @@ copies that list and increments each count; teardown decrements. A count may ove
 `munmap`ed still counts until teardown); it never understates.
 
 2.3. Cached frames are mapped **without `WRITABLE`** and with `SHARED_LEAF`, so that teardown
-doesn't free them and `fork` aliases them instead of copying (both as for SysV shared memory).
-Frames are freed only when their entry is no longer in the cache and its use count is 0.
+doesn't free them and `fork` aliases them instead of copying (both as for SysV shared memory),
+and with `CACHED_LEAF` (PTE bit 10), which tells `mprotect` a page is the cache's rather than a
+`MAP_SHARED` or SysV page (3.2). Frames are freed only when their entry is no longer in the cache
+and its use count is 0.
+
+2.3.1. The kernel runs with `CR0.WP` set, so a system call writing through a user pointer into a
+cached page faults instead of changing every process's copy.
 
 2.4. **Invalidation.** oxfs MUST call the kernel's `oxidebsd_content_changed(inode)` whenever an
 inode's contents change (a write, a truncation) or the inode is freed. The entry for that inode,
@@ -71,6 +76,10 @@ next exec; a library mapped read-only and then made writable with `mprotect` doe
 other processes' copy; `fork` keeps the pages shared and the counts right.
 
 5.2. bmake's `configure` on target, timed against the 29 s of 2026-09-30.
+
+Measured 2026-10-01: 15 s (rc 0). `execve` is 1.5 s over 991 calls (1.5 ms each), against 13 s
+before; `fork`'s eager copy (1.7 ms each) is now the costliest system call. The cache ended
+holding 33 files in 29,787 pages, with 3.76 million hits to 29,791 misses.
 
 ## 6. Open questions
 
