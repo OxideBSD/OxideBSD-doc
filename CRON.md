@@ -1,6 +1,6 @@
 # OxideBSD cron and periodic: design specification
 
-Status: **accepted design, not yet implemented.** Target release: v0.3.0.
+Status: **accepted design, implemented** (2026-09-30; see §11). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `cron(8)`, `crontab(1)`, `crontab(5)`,
@@ -169,3 +169,26 @@ is in the `cron` log, `crontab -l` round-trips an installed table, and an invali
 1. `at(1)`, `batch(1)` and `atrun(8)`: not planned yet.
 2. FreeBSD's `periodic security` run (`/etc/periodic/security`): deferred until there is something
    for it to check, such as set-user-ID files.
+
+## 11. Implementation notes
+
+Settled in the code (`lib/libcron`, `usr.sbin/cron`, `usr.bin/crontab`, `usr.sbin/periodic`,
+`etc/periodic`), and documented in the manual pages:
+
+1. **§4.6 `-s`/`-o`.** `-o` is the default, as in FreeBSD. Both are one mechanism: cron counts
+   minutes in UTC (`-o`) or in local time (`-s`), and §4.5's clock-change rules apply to the
+   count, so under `-s` a daylight-saving change is a clock change.
+2. **§3.2.** A field that *begins* with `*` counts as unrestricted for the day rule (Vixie
+   cron's behavior), so `0 0 */2 * 5` means odd days that are Fridays. `n/step` means
+   `n-max/step`. Bad lines are skipped and logged by cron; crontab refuses the whole table.
+3. **Tables** must be regular files owned by root and not group- or world-writable, or they are
+   skipped; `cron.d` file names are filtered as the BSDs' `not_a_crontab` does. A change is
+   noticed by modification time, of each table and of the three directories, at each wake.
+4. **Jobs** run in a runner process per job (jitter, PAM `cron` with `pam_nologin` and
+   `pam_unix`, `setusercontext` from `lib/liblogincap`, `$SHELL -c` in the home directory).
+5. **crontab** writes through a rename and moves `/var/cron/tabs`'s time. It writes no header
+   comment, so `-l` gives back exactly what was installed.
+6. **periodic** runs `/etc/periodic/<dir>` then `/usr/local/etc/periodic/<dir>`, each in name
+   order (not merged). Output for a user is logged at `daemon.notice` with `logger`.
+7. **Verification**: `lib/libcron` host tests (13, with spring-forward and fall-back in both
+   modes), `usr.sbin/cron` and `usr.bin/crontab` host tests, and `cron_syscall_smoke`.
