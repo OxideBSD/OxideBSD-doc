@@ -282,9 +282,11 @@ SeaBIOS's port `0x604`, but OVMF's is `0xb004`; `sys/acpi.rs` now reads the FADT
 - `/bin` and `/sbin` are statically linked, OpenBSD-style (`33a69e6`); `/sbin/nologin` added.
   Still missing from a BSD `/sbin`: `ifconfig`/`route` (below), `newfs`/`fsck` (oxfs tools),
   module load/unload tools, `swapon`/`savecore`/`dumpon` (need swap and crash dumps first).
-- Still BusyBox in `/bin` (27): `ash hush` (retire), `sleep sync link unlink rmdir nproc kill test
-  chmod`, `date stty dd df expr pgrep pkill`, `grep egrep fgrep sed ed` (regex library first),
-  `tar gzip gunzip zcat`; in `/sbin` (4): `mount umount mknod ping`. Rewrites are Rust std.
+- Rewritten in Rust std (`bc401ba`, `8a7d30a`): `sleep sync link unlink rmdir nproc kill test`
+  (`[`) `chmod`, and `mount`/`umount` over the new `nmount(2)` (584) with `/etc/fstab` and
+  `rc.d/mountcritlocal`. Still BusyBox in `/bin` (17): `ash` (stays for `configure`), `date stty dd
+  df expr pgrep pkill`, `grep egrep fgrep sed ed` (regex library first), `tar gzip gunzip zcat`;
+  in `/sbin`: `mknod ping` (and `mount umount` until the next BusyBox rebuild).
 
 ## After step 3
 
