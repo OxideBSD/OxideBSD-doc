@@ -37,6 +37,13 @@ Clang's resource directory moved with it: `/usr/lib/clang/23`.
 ### `/usr/tests` (7)
 `float-smoke`, `musl`, `smoke`, `std-hello`, `std-hello-oxidebsd`, `std-process-fs-oxidebsd`, `std-thread-net-signal-oxidebsd` -- regression fixtures.
 
+## Removed 2026-09-30
+
+45 more BusyBox applets, listed with the reasons in `BUSYBOX_APPLETS.md` ("Third cut"),
+including `/bin/hush`, `/usr/sbin/crond` and BusyBox's `/usr/bin/crontab` (now native).
+`/sbin` gained `init`, `nologin`, `reboot` (+ `halt`, `poweroff`), `rcorder`, `shutdown` and
+`emergency` since the list below was made; `/usr/sbin` gained `cron`, `periodic` and `syslogd`.
+
 ## Removed 2026-09-23
 
 48 BusyBox applets that don't belong in a BSD base system or can't work on this kernel:

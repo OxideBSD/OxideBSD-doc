@@ -26,6 +26,30 @@ remain, placed per `HIER.md` across `/bin`, `/sbin`, `/usr/bin` and `/usr/sbin`.
 (hush) is `/bin/hush`; `/bin/sh` is OxideBSD's own shell. The categories below predate this cut
 and still list the removed names.
 
+## Third cut, 2026-09-30: 45 more removed (init step 9)
+
+**139 BusyBox applets remain.** Removed in one rebuild:
+
+- **Replaced by native programs** (step 9): `crond`, `crontab` (cron(8), crontab(1)), `sysctl`,
+  `dmesg` (`/sbin`'s own), `halt`, `poweroff` (`/sbin/reboot`; these two were already built but
+  not installed).
+- **Superseded by OxideBSD's own mechanisms**: `hush` (`/bin/sh`; `test_busybox.sh` and
+  `/sbin/emergency`'s fallback moved to `ash`), `run-parts` (periodic(8)), `start-stop-daemon`
+  (rc.subr), `makedevs` (devfs), `killall5` (init's shutdown), `cttyhack` (init gives each
+  session the console).
+- **In no BSD base system** (Linux, Debian or daemontools tools): `setuidgid`, `envuidgid`,
+  `softlimit`, `chrt`, `remove-shell`, `cryptpw`, `mkpasswd`, `pscan`, `pipe_progress`,
+  `ttysize`, `volname`, `ipcalc`, `dnsdomainname`, `mountpoint`, `pwdx`, `free`, `usleep`, `ts`,
+  `fallocate`.
+- **Useful, but ports material** rather than base on any BSD: `lsof`, `pstree`, `tree`, `watch`,
+  `hexedit`, `dos2unix`, `unix2dos`, `shuf`, `shred`, `crc32`, `ascii`, `lzop`, `lzcat`,
+  `unlzma`.
+
+Kept although not BSD-base, as the only tool of their kind until a native one exists: `minips`
+(the only `ps`), `wget` and `ssl_client` (the only HTTPS client, until a `fetch`), `su` (until
+sudo-rs), `nslookup`, `ftpget`, `ftpput`. Still BusyBox and due for native rewrites: 26 in
+`/bin` (`ash` stays for `configure`) and 4 in `/sbin`; see `INIT_WORKPLAN.md`.
+
 ## Build succeeded: 287 applets (229 kept in the roster -- see "Removed before v0.1" below)
 
 **Pre-v0.1 roster cleanup**: 58 of these 287 built cleanly but their core function structurally

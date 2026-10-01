@@ -13,7 +13,7 @@ Last updated 2026-09-30, in the session that did cron stage 1 and init's first c
 Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
 `2e49de9`, `9056be8`). Step 6 is done too (OpenSSL, the trust store, dynamic Rust programs,
 loopback, syslog over TCP and TLS, through `b07c19d`). Step 7 (cron) is done (`6dc085d`, `dc01885`,
-`c4261e9`, `bb68898`). **Next: step 9 (the BusyBox roster cut).** A first cut of `/sbin/init` landed ahead of step 10
+`c4261e9`, `bb68898`). Step 9 (the BusyBox cut) is done. **Next: step 10, the rest of `/sbin/init`.** A first cut of `/sbin/init` landed ahead of step 10
 (`52656de`), so `/etc/rc` now runs at boot. The website has `robots.txt`
 (search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
 (`b316818`, deployed); what's left there is the owner's Search Console setup.
@@ -52,7 +52,7 @@ Next free syscall number: **584**.
 | 6 | OpenSSL 3, then syslog over TCP and TLS | done (`b07c19d`) |
 | 7 | cron, crontab, periodic | done (`bb68898`) |
 | 8 | Time zones | done |
-| 9 | BusyBox roster cut (one rebuild for everything replaced) | to do |
+| 9 | BusyBox roster cut (one rebuild for everything replaced) | done: 45 out, 139 left |
 | 10 | `/sbin/init` (init's step 3) | first cut done (`52656de`) |
 | — | After step 3: netif ioctls, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
 
