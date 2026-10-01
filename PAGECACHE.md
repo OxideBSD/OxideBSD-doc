@@ -46,7 +46,8 @@ recorded in 2.1.
 
 2.5. **Size.** The cache MUST NOT hold more than a quarter of physical memory in entries no
 address space uses. Past that, unused entries are freed, least recently used first. Entries in
-use are never freed.
+use are never freed. When the frame allocator runs out, it takes back the frames of unused
+entries the same way, one entry at a time, before failing (`pagecache::reclaim`).
 
 ## 3. Users
 
@@ -66,11 +67,12 @@ relocations are applied by `ld.so`, to writable pages only. A program with text 
 
 ## 4. Observability
 
-`vm.pagecache.entries`, `.pages` (frames held), `.hits`, `.misses` and `.limit` (sysctl).
+`vm.pagecache.entries`, `.pages` (frames held), `.hits`, `.misses` and `.limit` (sysctl; hits and
+misses are `u_long`, the rest `u_int`), and `.list`, a line per entry.
 
 ## 5. Verification
 
-5.1. On target: two runs of one program share frames (the second exec's `execve` phase "load
+5.1. On target (`tests/pagecache_syscall_smoke.rs`, `regress/pagecache-smoke/main.c`): two runs of one program share frames (the second exec's `execve` phase "load
 ELF" falls and `vm.pagecache.hits` rises); a program rebuilt in place runs the new code at its
 next exec; a library mapped read-only and then made writable with `mprotect` doesn't change
 other processes' copy; `fork` keeps the pages shared and the counts right.

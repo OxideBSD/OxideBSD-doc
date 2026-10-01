@@ -113,6 +113,12 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `vm.stats.vm.v_free_count` | unsigned int | read | free pages |
 | `vm.stats.vm.v_wire_count` | unsigned int | read | pages the kernel holds (heap, stacks, page tables, modules) |
 | `vm.stats.vm.v_user_count` | unsigned int | read | pages mapped into processes |
+| `vm.pagecache.entries` | unsigned int | read | files with pages in the read-only page cache (`PAGECACHE.md`) |
+| `vm.pagecache.pages` | unsigned int | read | frames the page cache holds |
+| `vm.pagecache.hits` | unsigned long | read | cached pages mapped since boot |
+| `vm.pagecache.misses` | unsigned long | read | pages read into the cache since boot |
+| `vm.pagecache.limit` | unsigned int | read | frames files no process uses may hold |
+| `vm.pagecache.list` | string | read | a line per entry: inode, size, frames held, uses |
 
 5.1. **Architecture names** are FreeBSD's, `hw.machine` naming the port and `hw.machine_arch`
 the processor architecture:
