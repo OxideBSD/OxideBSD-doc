@@ -521,7 +521,7 @@ freed anywhere in this kernel regardless, so there's nothing that needs unmappin
 either way; only the `nattch`/possible-removal bookkeeping needs to run.
 
 `RawShmidDs` (112 bytes) was verified via a direct `musl-gcc`/`sizeof`/`offsetof` probe against
-this port's own patched sysroot (`target/musl-sysroot`), same rigor `RawIpcPerm`/`RawMsqidDs`/
+this port's own patched sysroot (`toolchain/x86_64-unknown-oxidebsd`), same rigor `RawIpcPerm`/`RawMsqidDs`/
 `RawSemidDs` already established.
 
 **Verified end-to-end**: `tests/sysv_shm_syscall_smoke.rs` + `userland/sysv-shm-syscall-smoke/` --
