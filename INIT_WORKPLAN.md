@@ -53,7 +53,7 @@ Next free syscall number: **584**.
 | 7 | cron, crontab, periodic | done (`bb68898`) |
 | 8 | Time zones | done |
 | 9 | BusyBox roster cut (one rebuild for everything replaced) | done: 45 out, 139 left |
-| 10 | `/sbin/init` (init's step 3) | first cut done (`52656de`) |
+| 10 | `/sbin/init` (init's step 3) | states, ttys and signals done; logging/utmpx, recovery services, `init_path=` left |
 | — | After step 3: netif ioctls, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
 
 Steps 4, 7 and 8 don't depend on the socket work and may move earlier. syslogd (5) needs local
@@ -259,6 +259,13 @@ shell on the console, restarted when it exits (3 exits within 5 s pause 30 s); r
 session first, so `rc.shutdown` can take the console). The kernel embeds it (static PIE) and
 starts it without a controlling terminal (`InitProgram::console`); falls back to `/bin/sh` if it
 can't be started. What follows is what's left; the shell loop becomes the ttys/getty loop.
+
+**Part 1 done (2026-10-01):** the §3 states, `/etc/ttys` sessions (getty on `ttyv0`), FreeBSD's
+restart limit, `SIGHUP`/`SIGTERM`/`SIGTSTP`, the single-user password on an insecure console,
+recovery keeping the sessions it finds in `/proc`, `init(8)`, `/etc/profile`. `SIGTERM`'s
+single-user returns to multi-user without `/etc/rc` (decided: services keep running; INIT.md §3).
+Test: `init_syscall_smoke` (about a minute). Left: part 2 `syslog(3)` and utmpx records,
+part 3 recovery's service checks (§9.3), part 4 `init_path=`/`init=`.
 
 Found on the way and fixed (`poweroff` commit after `98cf1fc`): `poweroff` wrote PM1a control at
 SeaBIOS's port `0x604`, but OVMF's is `0xb004`; `sys/acpi.rs` now reads the FADT and `\_S5`.

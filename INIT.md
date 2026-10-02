@@ -43,15 +43,20 @@ Init is a state machine. Exactly one state is current at any time.
 
 | State | Behavior | Leaves to |
 |---|---|---|
-| `single-user` | Runs `/bin/sh` on the console; no other processes are started. | `runcom` when the shell exits |
+| `single-user` | Runs `/bin/sh` on the console; no other processes are started. | `runcom` when the shell exits; `multi-user` if entered through `clean-ttys` |
 | `runcom` | Runs `/etc/rc` and waits for it. | `multi-user` on success; `single-user` if `/etc/rc` fails |
 | `multi-user` | Runs and supervises the sessions listed in `/etc/ttys`; reaps all orphans. | `clean-ttys` or `shutdown` on request |
-| `clean-ttys` | Stops starting new sessions and terminates existing ones. | `single-user` |
+| `clean-ttys` | Stops starting new sessions and terminates existing ones. Services keep running. | `single-user` |
 | `shutdown` | Runs `/etc/rc.shutdown`, terminates all processes, synchronizes storage, invokes `reboot(2)`. | none |
 | `recovery` | Entered only by a respawned init (§9). Restores missing sessions and services. | `multi-user` |
 
 **Rationale.** A single-user state that the boot falls back to on failure is the traditional BSD
 repair path; it guarantees an interactive shell whenever the system cannot come up on its own.
+
+Single-user mode reached through `clean-ttys` (`SIGTERM`) leaves the services `/etc/rc` started
+running, so leaving it returns to `multi-user` without running `/etc/rc` again, which would start
+them twice. FreeBSD instead stops everything first; OxideBSD keeps them so that maintenance on the
+console does not interrupt services.
 
 ## 4. Boot
 
@@ -221,7 +226,8 @@ The design depends on the following kernel behavior, some of which does not exis
 
 Implemented in userland: `/sbin/rcorder` (with FreeBSD's `-k`, `-s`, `-p` and `-g`), `/etc/rc`,
 `/etc/rc.shutdown`, the `rc.subr` built-ins (INIT_SH.md §4.7), `reboot`/`halt`/`poweroff`,
-`shutdown`, `/sbin/emergency`. Not yet: `/sbin/init`, getty, login, `initconf`, running service
+`shutdown`, `/sbin/emergency`, `/sbin/init` (§§3-7, 10; recovery's service checks not yet), getty,
+login. Not yet: `initconf`, running service
 blocks.
 
 ## 12. Initial services
@@ -237,7 +243,8 @@ temporary files to `/tmp`.
 
 ## 13. Open questions
 
-1. Getty restart rate limit (§5.3): the exact threshold and delay.
+1. ~~Getty restart rate limit (§5.3): the exact threshold and delay.~~ Resolved: FreeBSD's. Three
+   exits within 5 seconds of starting pause the entry for 30 seconds.
 2. ~~Where init records messages before `syslogd` is running.~~ Resolved (`SYSLOG.md` §5): init
    opens its log with `LOG_CONS`, so its messages reach `/dev/console` until `syslogd` starts;
    kernel messages wait in the message buffer.
