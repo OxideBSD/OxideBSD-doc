@@ -140,8 +140,8 @@ functions the port needs.
    under a `nosuid` mount), `access(2)` on the real IDs, set-ID bits cleared by a write or
    `chown` from anyone but root; `cred_syscall_smoke`.
 2. `/dev/tty`, `/dev/console`, `ttyname` (§5.2.1–5.2.2); `/proc` start time and syscall 318 (§5.3).
-   `/dev/tty` and `/dev/console` are devfs nodes (342fda3, `sys/tty/console.rs`). `/proc/<pid>/stat`
-   field 22 is still 0.
+   Done: `/dev/tty` and `/dev/console` are devfs nodes (342fda3); `ttyname` works through
+   `/proc/self/fd`; `/proc/<pid>/stat` field 22 and `getrandom` at 318 (`f3d98a0`).
 3. Pseudo-terminals (§5.2.3), after `PTY.md` is written and accepted. Not started.
 4. OpenPAM (§5.4). Independent of 3. Done (093ec0e).
 5. The sudo-rs port and seeding (§6), then §7. Not started; `/etc/group` has no `wheel` yet.
