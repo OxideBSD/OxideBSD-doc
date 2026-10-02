@@ -28,7 +28,10 @@ Where every program goes, BusyBox or not: `HIER.md`. Native rewrites still plann
 
 Kept although no BSD base system ships them, as the only tool of their kind until a native one
 exists: `minips` (the only `ps`), `wget` and `ssl_client` (the only HTTPS client, until a
-`fetch`), `su` (until sudo-rs), `nslookup`, `ftpget`, `ftpput`.
+`fetch`), `nslookup`, `ftpget`, `ftpput`.
+
+`su` is still built but no longer installed: sudo-rs's `su` replaced it (ea7b74b). It leaves
+the roster with the next batch of BusyBox changes, which rebuilds BusyBox.
 
 ## 3. Removed applets
 

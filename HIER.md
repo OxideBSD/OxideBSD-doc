@@ -39,23 +39,23 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 Not yet present, and expected here: `ifconfig` and `route` (need interface-configuration ioctls),
 `fsck` and `newfs` for oxfs.
 
-## 4. `/usr/bin` (123 entries)
+## 4. `/usr/bin` (125 entries)
 
 | Source | Programs |
 |--------|----------|
 | Native (`usr.bin/`, 8) | `apropos`, `crontab`, `logger`, `login`, `man`, `more`, `oxdoc`, `passwd` |
-| Forks and vendored ports (7) | `bmake` (`usr.bin/make`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`) |
-| Links (4) | `whatis` -> `apropos`, `less` -> `more`, `make` -> `/usr/bin/bmake`, `clang++` -> `clang` |
-| BusyBox (104) | listed in `BUSYBOX_APPLETS.md` §2 |
+| Forks and vendored ports (9) | `bmake` (`usr.bin/make`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`), `sudo` and `su` (`external/mit/sudo-rs`, set-user-ID root, mode 4755) |
+| Links (5) | `whatis` -> `apropos`, `less` -> `more`, `make` -> `/usr/bin/bmake`, `clang++` -> `clang`, `sudoedit` -> `sudo` |
+| BusyBox (103) | listed in `BUSYBOX_APPLETS.md` §2 (BusyBox `su` is built but not installed) |
 
 Clang's resource directory is `/usr/lib/clang/23`.
 
-## 5. `/usr/sbin` (11 entries)
+## 5. `/usr/sbin` (12 entries)
 
 | Source | Programs |
 |--------|----------|
 | Native (`usr.sbin/`, 8) | `certctl`, `cron`, `makewhatis`, `newsyslog`, `periodic` (a shell script), `pwd_mkdb`, `syslogd`, `tzsetup` |
-| Vendored (1) | `zic` (`external/public-domain/tz`) |
+| Vendored and forks (2) | `zic` (`external/public-domain/tz`), `visudo` (`external/mit/sudo-rs`) |
 | BusyBox (2) | `chroot`, `ntpd` |
 
 ## 6. Other directories

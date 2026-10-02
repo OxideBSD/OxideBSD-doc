@@ -1,7 +1,6 @@
 # OxideBSD privilege escalation (sudo-rs): design specification
 
-Status: **accepted**, not implemented (2026-10-01; some prerequisites done, see §8). Target
-release: v0.3.0.
+Status: **implemented** (2026-10-02, ea7b74b; see §8). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -40,7 +39,7 @@ would need the same patch.
 | `/var/run/sudo-rs/ts` | 0700, root | sudo-rs timestamp records |
 | `libpam.a` | | OpenPAM, `/usr/lib` (a porting-layer library) |
 
-`/etc/group` gains `wheel:x:0:root,user`.
+`/etc/group` gains `wheel:*:10:root,user`; gid 0 stays `root` (decided 2026-10-02).
 
 ## 4. What sudo-rs needs
 
@@ -144,7 +143,11 @@ functions the port needs.
    `/proc/self/fd`; `/proc/<pid>/stat` field 22 and `getrandom` at 318 (`f3d98a0`).
 3. Pseudo-terminals (§5.2.3). Done (63fbf11): `PTY.md`; `/dev/ptmx` and `/dev/pts/N`.
 4. OpenPAM (§5.4). Independent of 3. Done (093ec0e).
-5. The sudo-rs port and seeding (§6), then §7. Not started; `/etc/group` has no `wheel` yet.
+5. The sudo-rs port and seeding (§6), then §7. Done (ea7b74b): `OxideBSD/sudo-rs-oxidebsd`
+   (`oxidebsd` branch, v0.2.15) at `external/mit/sudo-rs`; `wheel` is group 10 (gid 0 stays
+   `root`), with `root` and `user`; `/etc/sudoers` grants `%wheel`; `sudo_syscall_smoke`. Not yet:
+   `su` asks root for a password (no `pam_rootok`) and isn't limited to `wheel` (no
+   `pam_group`), as FreeBSD's `su` policy does.
 
 ## 9. Open questions
 
