@@ -119,6 +119,7 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `vm.pagecache.misses` | unsigned long | read | pages read into the cache since boot |
 | `vm.pagecache.limit` | unsigned int | read | frames files no process uses may hold |
 | `vm.pagecache.list` | string | read | a line per entry: inode, size, frames held, uses |
+| `debug.kill_init` | int | read-write | writing a signal number kills init with it, so that its restart (`INIT.md` §9) can be tested; reads 0 |
 
 5.1. **Architecture names** are FreeBSD's, `hw.machine` naming the port and `hw.machine_arch`
 the processor architecture:
