@@ -48,8 +48,6 @@ number, so the call fails with `ENOSYS` (or, where noted, the interface fails an
 | `truncate` | `truncate` (`76`) | `src/unistd/truncate.c` | Unpatched call site; `ftruncate` works. |
 | `waitid` | `waitid` (`247`) | `src/process/waitid.c` | `wait4` exists; `waitid` has no handler. |
 | `pselect` | `pselect6` (`270`) | `src/select/pselect.c` | `select` (`23`), `poll` (`148`) and `ppoll` (`575`) exist. |
-| `setegid` | `setresgid` (`501`) | `src/unistd/setegid.c` | `seteuid` works (`setresuid`, `499`, `e6523ad`); the gid side was never added. |
-| `setreuid`, `setregid` (XSI) | `setreuid` (`113`), `setregid` (`114`) | `src/unistd/setreuid.c`, `src/unistd/setregid.c` | |
 | `pthread_mutexattr_setrobust(..., PTHREAD_MUTEX_ROBUST)`, `pthread_mutex_consistent` | `get_robust_list` (`274`) | `src/thread/pthread_mutexattr_setrobust.c` | musl probes `get_robust_list` and returns its error; `set_robust_list` (`273`) is a no-op success (`394984e`). |
 | `posix_fadvise` | `fadvise64` (`221`) | `src/fcntl/posix_fadvise.c` | Advisory (ADV option). |
 | `posix_madvise` | `madvise` (`28`) | `src/mman/posix_madvise.c` | `POSIX_MADV_DONTNEED` returns 0 inside musl; every other advice returns `ENOSYS`. Advisory (ADV option). |
@@ -87,6 +85,7 @@ crate.
 
 | POSIX interface(s) | Number(s) | Module | Commit | Notes |
 |---|---|---|---|---|
+| `setuid`, `setgid`, `seteuid`, `setegid`, `setreuid`, `setregid`, `setresuid`, `setresgid`, `getresuid`, `getresgid`, `getgroups`, `setgroups`; real, effective and saved IDs, set-user-ID `execve` | `162`/`163`, `499`-`502`, `113`/`114`, `164`/`178` | `posix_compat` | `282249f` | `SUDO.md` §5.1; `cred_syscall_smoke`. |
 | `raise`, `abort`, `pthread_kill` (via `tkill`) | `200` | `signal` | `55e7e23` | |
 | `times` | `493` | `posix_compat` | `55e7e23` | Real per-process CPU time since `65d25e8`. |
 | `sigpending` | `494` | `signal` | `55e7e23` | |

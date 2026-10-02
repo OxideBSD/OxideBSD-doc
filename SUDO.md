@@ -135,9 +135,10 @@ functions the port needs.
 
 ## 8. Order of work
 
-1. Kernel credentials (§5.1). Not started: a process has one `uid` and `gid`; `AT_SECURE` is
-   always passed as 0; oxfs keeps the set-user-ID, set-group-ID and sticky bits
-   through `chmod` (342fda3).
+1. Kernel credentials (§5.1). Done (`282249f`): real, effective and saved IDs, supplementary
+   groups, set-user-ID and set-group-ID `execve` with `AT_SECURE` (ignored for `#!` scripts and
+   under a `nosuid` mount), `access(2)` on the real IDs, set-ID bits cleared by a write or
+   `chown` from anyone but root; `cred_syscall_smoke`.
 2. `/dev/tty`, `/dev/console`, `ttyname` (§5.2.1–5.2.2); `/proc` start time and syscall 318 (§5.3).
    `/dev/tty` and `/dev/console` are devfs nodes (342fda3, `sys/tty/console.rs`). `/proc/<pid>/stat`
    field 22 is still 0.

@@ -16,7 +16,6 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| One uid and one gid per process; no real/effective/saved split (`setresuid` stores a single value); supplementary groups not stored (`getgroups` returns the caller's gid); setuid/setgid bits ignored at `execve`. | POSIX credentials; setuid executables | v0.3.0 (`SUDO.md` §5.1) |
 | Syscalls dereference user pointers without validating them (`sys_read`/`sys_write` and others); a bad pointer faults instead of returning `EFAULT`. | `copyin`/`copyout` with `EFAULT` | v0.3.0 |
 | No `NO_EXECUTE` on any page, no W^X; module pages all writable; ELF segments sharing a page don't union their flags. | NX stacks and data, read-only text | later |
 
@@ -75,6 +74,7 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-01 — real, effective and saved user and group IDs, supplementary groups, set-user-ID and set-group-ID `execve` with `AT_SECURE`, `access(2)` on the real IDs, the `nosuid` mount option — 282249f
 - 2026-09-24 — `AT_RANDOM` is 16 fresh random bytes per `execve` — f97971a (branch `cleanup-easy-shortcuts`)
 - 2026-09-24 — `reboot(2)` is root-only — f97971a
 - 2026-09-24 — `kill(-1, sig)` signals every permitted process except init and the caller — f97971a
