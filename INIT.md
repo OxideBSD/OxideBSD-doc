@@ -63,6 +63,15 @@ console does not interrupt services.
 4.1. The kernel MUST start `/sbin/init` as process 1. Boot flags from the kernel command line MUST
 be passed to init as arguments: `-s` requests the `single-user` state.
 
+4.1.1. `init=<path>` (Linux's) and `init_path=<path>[:<path>...]` (FreeBSD's) on the kernel
+command line name other programs to start instead, tried in that order (`init=` first). The
+kernel can only start a process from an image in memory, so it then runs its embedded
+`start_init` as process 1, which executes each path in turn, keeping the process ID, with the boot
+flags; on a restart after a death (§9.2) `-R` is passed to `/sbin/init` only. If none can be run,
+`/bin/sh` is tried on the console, and if that fails `start_init` exits, so the supervision of
+§9 restarts it and finally runs the emergency program. Without either option the embedded
+`/sbin/init` is started directly, as §9.6 requires.
+
 4.2. Init MUST NOT depend on inherited environment variables. It MUST construct the environment
 for its children explicitly, including at least `PATH`, `HOME`, `SHELL` and `TERM`. The default
 `PATH` for root is `/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin`.
@@ -221,6 +230,7 @@ The design depends on the following kernel behavior, some of which does not exis
 |---|---|---|
 | `kill(-1, sig)` signals every process except process 1 and the caller | 10.3 | Done (f97971a) |
 | Boot flags passed to init as arguments | 4.1 | Done (27dbcb1): `-s` on the kernel command line gives `/sbin/init -s` |
+| `init=` and `init_path=` | 4.1.1 | Done: `sys/kern/start_init` |
 | Signal protection for process 1 | 9.1 | Done (b212178) |
 | Respawn, reparenting and repeated-failure program | 9.2–9.6 | Done (b212178); `debug.kill_init` (`SYSCTL.md` §5) kills init to test it |
 | `sethostname(2)` (`rc.d/hostname`) | 12 | Done (b212178): `SYS_SETHOSTNAME` = 576 |
