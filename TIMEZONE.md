@@ -1,6 +1,6 @@
 # OxideBSD time zones: design specification
 
-Status: **accepted design, implemented** (2026-09-29). Target release: v0.3.0.
+Status: **implemented** (2026-09-29, `ad62ef1`; §5.4 in `1cdd114`). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `tzfile(5)`, `zic(8)`, `zdump(8)`,
@@ -64,8 +64,7 @@ database update); `-n` shows what would be done without doing it.
 5.4. Running programs follow a change of the local zone without a restart, as on FreeBSD: with `TZ`
 unset, the C library checks `/etc/localtime` again at most once a second when converting local
 time, and reloads the zone if it is a different file (device, inode, size or modification time).
-musl alone keeps the zone a program started with; this is OxideBSD's change to it. (This
-replaces an earlier requirement that `syslogd` and `cron` re-read the zone on `SIGHUP`.)
+musl alone keeps the zone a program started with; this is OxideBSD's change to it.
 
 ## 6. Verification
 

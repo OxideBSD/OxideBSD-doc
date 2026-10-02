@@ -1,6 +1,6 @@
 # OxideBSD floppy installer and El Torito boot: design specification
 
-Status: **draft, not yet reviewed** (2026-09-30). Not scheduled for a release.
+Status: **draft**, not yet reviewed (2026-09-30). Not scheduled for a release.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. It depends on `INIT.md` (the installer runs as init's single-user shell), `UNIX.md`
@@ -132,7 +132,7 @@ no `/etc/rc` and starts the shell, whose profile starts the installer.
 7. installs the boot loader on the target disk;
 8. offers to reboot.
 
-6.2. **What OxideBSD lacks for this today**, each needed for more than the installer:
+6.2. **What OxideBSD lacks for this** (as of 2026-10-01), each needed for more than the installer:
 - interface configuration ioctls and a DHCP client (interfaces are static now);
 - network drivers beyond the rtl8139: at least e1000 and virtio-net;
 - `newfs` (and `fsck`) for oxfs, and a partitioning tool;

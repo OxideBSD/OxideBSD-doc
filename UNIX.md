@@ -1,6 +1,6 @@
 # OxideBSD sockets and local sockets: design specification
 
-Status: **accepted design, implemented** (sockets stages 1-5, 2026-09-29; the loopback interface
+Status: **implemented** (sockets stages 1-5, 2026-09-29; the loopback interface
 and local addresses, §11.4-11.6, 2026-09-30). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -23,8 +23,7 @@ named in the file system or in the abstract namespace, or unnamed.
 
 1.3. Descriptor passing (`SCM_RIGHTS`) and credential passing, in the BSD form and the Linux form.
 
-1.4. A socket system-call interface that carries every argument POSIX defines, replacing the
-reduced forms in use today (§4).
+1.4. A socket system-call interface that carries every argument POSIX defines (§4).
 
 1.5. The loopback interface, `lo0`, and the local address of an Internet socket (§11.4-11.6).
 
@@ -41,8 +40,8 @@ reduced forms in use today (§4).
 | `sys/net/` | Interfaces and Ethernet |
 | `sys/net/ifnet.rs` | The interfaces (`lo0`, `rl0`) and the route lookup (§11.4) |
 | `sys/net/if_loop.rs` | `lo0`'s output queue (§11.4) |
-| `sys/drivers/rtl8139.rs` | The network interface driver (moved from `sys/net/`) |
-| `sys/modules/socket` | Registers the socket system calls, for every family (renamed from `sys/modules/net`) |
+| `sys/drivers/rtl8139.rs` | The network interface driver |
+| `sys/modules/socket` | Registers the socket system calls, for every family |
 | `sys/modules/oxfs` | Socket inodes (`S_IFSOCK`) |
 | `external/mit/musl` | `src/network/*` wrappers, `getpeereid(3)`, credential structures |
 
@@ -89,9 +88,8 @@ waiter blocks, so that interrupts (the timer, `alarm(2)`, the keyboard) are take
 is serviced by its waiters, so an `AF_INET` waiter is also woken by a received frame and at least
 every 50 ms, to drive the interface and TCP's retransmission timer.
 
-**Rationale.** Today each socket call walks a fixed chain (UDP, then TCP, then ICMP) and the C
-library drops arguments the system calls cannot carry. A protocol switch is how every BSD kernel
-structures sockets; it makes a new family a table entry instead of another link in the chain.
+**Rationale.** A protocol switch is how every BSD kernel structures sockets; it makes a new family
+a table entry instead of another link in a fixed chain of protocols.
 
 ## 4. System-call interface
 
@@ -281,7 +279,7 @@ the sender (§9.3) is dropped, so the receiver sees one set of credentials, the 
 ## 10. Socket pairs
 
 10.1. `socketpair(AF_UNIX, type, 0, sv)` accepts all three types and returns two unnamed sockets
-connected to each other. It replaces the pipe-based pair in `sys/fs/pipe.rs`, which is removed.
+connected to each other. It is not built on pipes.
 
 10.2. Any other domain fails with `EOPNOTSUPP`.
 

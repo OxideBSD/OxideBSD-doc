@@ -1,6 +1,7 @@
-# OxideBSD manual pages: oxdoc, man and apropos — design specification
+# OxideBSD manual pages (oxdoc, man, apropos): design specification
 
-Status: **accepted design, partly implemented** (see §13). Target release: v0.3.0.
+Status: **partly implemented** (2026-10-01; steps 1-4 done, step 5 in progress, see §13). Target
+release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces will be documented in the manual pages `oxdoc(1)`, `man(1)`, `apropos(1)`,
@@ -191,13 +192,13 @@ answer from a freshly built index, and `oxdoc -T lint` passes on every page Oxid
 
 1. roff core, `mdoc`, the terminal device, `oxdoc`, `man` and `more` — enough to read OxideBSD's
    own pages.
-
-Each language's manual page (`roff(7)`, `mdoc(7)`, `man(7)`, `tbl(7)`, `eqn(7)`) is written with
-its parser, in the same step.
 2. `man` language and lint.
 3. `tbl`.
 4. The index, `makewhatis`, `apropos` and `whatis`.
 5. `eqn`, HTML and Markdown.
+
+Each language's manual page (`roff(7)`, `mdoc(7)`, `man(7)`, `tbl(7)`, `eqn(7)`) is written with
+its parser, in the same step.
 
 ## 12. Resolved questions
 
@@ -214,7 +215,7 @@ its parser, in the same step.
 | 2. `man` language and lint | Done: 94% of a 1500-page man(7) sample matches mandoc; `man(7)` reference written; `-T lint` matches mandoc's diagnostics on 80% of the man(7) sample and 92% of the mdoc one (Xr lookups need step 4) |
 | 3. `tbl` | Done: 102 of the samples' 106 pages with tables match mandoc; tbl diagnostics in lint; `tbl(7)` reference written |
 | 4. Index, `makewhatis`, `apropos`, `whatis` | Done: `makewhatis`, `apropos`, `whatis` (with full text, `-t`) and `man`'s lookup by any page name; queries over a 2300-page sample match mandoc's apart from the differences below; the system's index is built with the image; `apropos(1)`, `makewhatis(8)` written |
-| 5. `eqn`, HTML, Markdown | Not started |
+| 5. `eqn`, HTML, Markdown | In progress: `eqn` parser and terminal rendering, `eqn(7)` written (6e0b484); `-T html` for mdoc (55fba31), man(7) and tbl (3129a82), 1254 of the 1500-page man(7) sample matching mandoc as of 4b43d35; Markdown not started |
 
 Known, intended differences from mandoc 1.14.6: `.MR` (groff 1.23) is implemented; `.TQ` follows
 groff (no blank line before it), where mandoc lays it out like `.TP`; `apropos` lists a page's

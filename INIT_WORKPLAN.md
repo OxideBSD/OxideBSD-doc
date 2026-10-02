@@ -1,323 +1,52 @@
-# OxideBSD init, step 2 and 3: work plan
+# OxideBSD init steps 2 and 3: work plan
 
-A working list, not a specification: what remains of init's step 2 (sockets, sysctl, the
-message buffer, syslog, cron, time zones) and step 3 (`/sbin/init` itself), in order, with the
-decisions already taken, the traps already found, and how each part is verified. The design is in
-`UNIX.md`, `SYSCTL.md`, `SYSLOG.md`, `CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md`
-and `TTY.md`; this file doesn't repeat it. Update it as parts land.
+Status: **steps 1-10 done; remaining work in §3** (2026-10-01, 946dfa0).
 
-Last updated 2026-09-30, in the session that did cron stage 1 and init's first cut.
+## 1. Scope
 
-## Where things stand
+The order of work for init's step 2 (sockets, sysctl, the message buffer, syslog, cron, time
+zones) and step 3 (`/sbin/init` itself). The design is in `UNIX.md`, `SYSCTL.md`, `SYSLOG.md`,
+`CRON.md`, `TIMEZONE.md`, `INIT.md`, `INIT_SH.md`, `LOGIN.md` and `TTY.md`; this file does not
+repeat it. The per-step narratives that used to be here are in `HISTORY.md` and the commit
+messages.
 
-Sockets (all five stages), step 4 and step 5 are done and committed (OxideBSD `60d0b7f`,
-`2e49de9`, `9056be8`). Step 6 is done too (OpenSSL, the trust store, dynamic Rust programs,
-loopback, syslog over TCP and TLS, through `b07c19d`). Step 7 (cron) is done (`6dc085d`, `dc01885`,
-`c4261e9`, `bb68898`). Step 9 (the BusyBox cut) is done. Step 10, `/sbin/init`, is done (2026-10-01). **Next: "After step 3" below.** The website has `robots.txt`
-(search engines and archives welcome, AI crawlers refused), a sitemap and meta descriptions
-(`b316818`, deployed); what's left there is the owner's Search Console setup.
+## 2. Steps
 
-## Done
-
-| Part | Commits | Notes |
+| # | Part | Commits |
 |---|---|---|
-| Specs (UNIX, SYSLOG, SYSCTL, CRON, TIMEZONE), INIT.md §§11-13 updated | doc `419c264`, `48d6e1c`, `c3179b8` | all accepted |
-| Website `/doc/` renders the specs | doc `3edd514` | `website/doc.sh`, lowdown |
-| BSD source layout: `sys/netinet`, rtl8139 in `sys/drivers`, `sys/modules/socket` | `3a7c686` | |
-| Sockets stage 1: socket layer and protocol switch (`sys/kern/uipc_socket.rs`) | `d6f73cd` | UDP, TCP, raw ICMP are `Protocol`s |
-| Sockets stage 2: `sendmsg`/`recvmsg` (577/578), `get/setsockopt` (579/580), `getpeername` (581), `accept4` (582), flags, options, timeouts, blocking socket waits, UDP `connect`, TCP non-blocking `connect`/`shutdown`/`SO_ERROR` | `a73d4a3`, musl `b37feab1` | `regress/socket-smoke`, 64 checks |
-| Sockets stage 3: local sockets (`sys/kern/uipc_usrreq.rs`), oxfs socket inodes, `socketpair` on them | `38bbcb4` | `regress/socket-smoke`, 165 checks; `wget` HTTPS checked by hand |
-| Sockets stage 4: `SCM_RIGHTS` (hold/release/install, gc, 1024/4096 limits), credentials (`LOCAL_PEERCRED`, `SO_PEERCRED`, `getpeereid`, `SCM_CREDS`, `LOCAL_CREDS[_PERSISTENT]`, `SO_PASSCRED`/`SCM_CREDENTIALS`) | see git log, musl `2af0e5a2` | `regress/socket-smoke`, 213 checks; canary unchanged |
-| Step 4: sysctl(2) + tree, message buffer, `/dev/klog` (7,0), load average, exact memory statistics, tunables with enforced `kern.maxproc`/`kern.maxfiles`, `/sbin/sysctl`, `/sbin/dmesg`, `rc.d/sysctl`, `uname -m` = `amd64` | `f021210`, `75c6e7d`, `1005023`, musl `8f9c13ce` | `sysctl_syscall_smoke` (87 checks), `sysctl_tunables_smoke`; POSIX canary unchanged |
+| 1 | Sockets stage 3: local sockets (`sys/kern/uipc_usrreq.rs`) | `38bbcb4` |
+| 2 | Sockets stage 4: descriptor and credential passing | `4d48d3d`, musl `2af0e5a2` |
+| 3 | Sockets stage 5: manual pages; `UNIX.md` implemented | `60d0b7f` |
+| 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | `f021210`, `75c6e7d`, `1005023` |
+| 5 | syslogd, logger, newsyslog | `9056be8` |
+| 6 | OpenSSL 3, trust store, dynamic Rust programs, loopback, syslog over TCP and TLS | `d2551f6`, `31c5c69`, `d33a27d`, `a9b8d5b`, `ab98faf`, `d346cb0`, `c22d920`, `b07c19d` |
+| 7 | cron, crontab, periodic | `6dc085d`, `dc01885`, `c4261e9`, `bb68898` |
+| 8 | Time zones | `58a2945`, `ad62ef1` |
+| 9 | BusyBox roster cut | `98cf1fc` |
+| 10 | `/sbin/init` | `52656de`, `3e3241e`, `6899d9d`, `3295c7c`, `946dfa0` |
 
-| Sockets stage 5: manual pages (`socket.2` ... `unix.4`, `getpeereid.3`); `UNIX.md` implemented | `60d0b7f` | lint clean |
-| oxfs: `flock` on write descriptors; buffered writes visible to other descriptors | `2e49de9` | found by syslogd's pid file; `needs-syscall-smoke` |
-| Step 5: `lib/libsyslog`, syslogd, logger, newsyslog, `etc/` files, rc.d, six manual pages | `9056be8` | `syslog_syscall_smoke` (36 checks); 37 host tests; regression set passes |
-| oxfs: dynamic inode tables (inode file per pool, `SUPERBLOCK_VERSION` 4) | `475e995` | 5821 inodes after seeding; remount checked by hand |
-| oxfs: inodes and blocks freed when nothing refers to them (`oxidebsd_inode_in_use`, orphans, mount sweep) | `13113f8` | `needs-syscall-smoke`; POSIX canary identical |
-| Step 8: tz 2026d vendored, `/usr/share/zoneinfo`, zic, zdump, tzsetup, syslogd zone reload | `58a2945`, `ad62ef1` | `tz_syscall_smoke` (34 checks) |
+Next free syscall number: **585** (`nmount(2)` took 584).
 
-Next free syscall number: **584**.
+## 3. Remaining work
 
-## Order
+1. Interface configuration ioctls and `rc.d/netif` (`INIT.md` §11).
+2. `/sbin/initconf` and running service blocks (`INIT_SH.md` §4.1-4.4).
+3. `daemon(8)` for `<name>_restart` (`INIT.md` §8.2).
+4. The `LOGIN.md` leftovers: the `tty01` serial tests (§9.2) and `who`.
+5. Manual pages referenced but not written: `re_format(7)`, `utmpx(5)`, `syslog(3)`.
+6. A kernel API for modules to add sysctl variables (`SYSCTL.md` §3.6, a MAY; `vfs.oxfs` first).
+7. `/proc/meminfo` reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
 
-| # | Part | Status |
-|---|---|---|
-| 1 | Sockets stage 3: local sockets | done |
-| 2 | Sockets stage 4: descriptor and credential passing | done |
-| 3 | Sockets stage 5: manual pages; `UNIX.md` marked implemented | done |
-| 4 | sysctl, message buffer, `/dev/klog`, load average, memory statistics, tunables | done |
-| 5 | syslogd, logger, newsyslog (without TLS) | done |
-| 6 | OpenSSL 3, then syslog over TCP and TLS | done (`b07c19d`) |
-| 7 | cron, crontab, periodic | done (`bb68898`) |
-| 8 | Time zones | done |
-| 9 | BusyBox roster cut (one rebuild for everything replaced) | done: 45 out, 139 left |
-| 10 | `/sbin/init` (init's step 3) | done (four parts, 2026-10-01) |
-| — | After step 3: netif ioctls, `initconf`, `daemon(8)`, `LOGIN.md` leftovers | later |
+## 4. Known open issues
 
-Steps 4, 7 and 8 don't depend on the socket work and may move earlier. syslogd (5) needs local
-datagram sockets (1). init (10) needs syslog (5) and uses sysctl (4).
+- oxdoc: `.Op` inside `.Oo`/`.Oc` on an `.It` line swallows the item's body; `dmesg.8`'s
+  `.Sm off`/`.Ql` idiom renders wrong; lint does not flag an unknown `.St`.
+- `wget` over TCP is slow (stop-and-wait). BusyBox `tar` has no gzip support (`tar xzf` fails;
+  `gunzip -c | tar xf -` works).
+- `daily/110.clean-tmps` is not exercised by a test (off by default; relies on BusyBox `find`'s
+  `-mindepth`, `-empty` and `-atime`). `crontab(1)` refusing a non-root caller is not tested.
 
-## 1. Sockets stage 3: local sockets — done (`38bbcb4`)
-
-As planned, with these details settled in the code: oxfs registers one pair of callbacks
-(`oxidebsd_register_socket_nodes(create, lookup)`), each `(path_ptr, path_len) -> inode | -errno`;
-the kernel keys sockets by inode number alone (inode numbers are unique across oxfs's pools). No
-`SUPERBLOCK_VERSION` bump: the socket kind is a new code in the existing kind byte. `mknod(2)` with
-`S_IFSOCK` stays `EINVAL`, as in FreeBSD. Stream control-data attachment (§6.4) waits for stage 4:
-the receive queue is already a list of messages, so a message carrying control data will simply
-not be merged into.
-
-A disk image formatted before stage 2's musl change still holds BusyBox binaries that call the
-retired syscall 142; delete `target/oxfs_disk.img` to reseed.
-
-## 2. Sockets stage 4: descriptors and credentials — done
-
-As planned. Settled in the code: `SOL_LOCAL` is 0x200 and `LOCAL_PEERCRED`/`LOCAL_CREDS`/
-`LOCAL_CREDS_PERSISTENT` are 0x1001-0x1003 (FreeBSD's 0 and 1-3 collide with `SOL_IP` and `SO_*`
-in musl); `SCM_CREDS`/`SCM_CREDS2` keep FreeBSD's 3 and 8. A peek shows credentials but leaves
-descriptors in the message. `gc` also runs when a descriptor of an in-flight description is
-closed (a socket sent over itself is never destroyed otherwise). Once a socket's own descriptors
-are gone nobody can read its queue, so it's garbage even while its peer is open.
-
-## 3. Sockets stage 5: manual pages — done (`60d0b7f`)
-
-mdoc pages in `share/man` (lint clean with `oxdoc -T lint`): `unix.4`, `socket.2`, `sendmsg.2`
-(and `send`/`sendto` links), `recvmsg.2`, `getsockopt.2`, `getpeereid.3`, `accept.2`, `bind.2`,
-`connect.2`, `listen.2`, `shutdown.2`, `socketpair.2`. Seed them in oxfs (`man_man2`/`man4` need
-`ensure_dir`s, as `man3` got for `sysctl.3`); `build_man_index` picks them up. Mark `UNIX.md`
-implemented (its status line, `Status: **...**`), which the website's spec index shows.
-
-Document what the code settled that the spec doesn't say: `SOL_LOCAL` 0x200 and `LOCAL_*`
-0x1001-0x1003; `SCM_CREDS` 3 / `SCM_CREDS2` 8; a peek shows credentials but not descriptors;
-`read(2)` on a socket closes descriptors it can't return; `CMSG_SPACE` padding counts as room
-(a `CMSG_SPACE(sizeof(int))` buffer takes two descriptors, as on Linux); autobind names are five
-hex digits. `oxdoc` lints on the host: `cd lib/liboxdoc && cargo build --release --bin
-oxdoc-host`, then `target/x86_64-unknown-linux-gnu/release/oxdoc-host -T lint PAGE` (the
-`usr.bin/oxdoc` crate builds for OxideBSD only).
-
-## 4. sysctl, message buffer, `/dev/klog`, load average, memory statistics — done
-
-The musl leftovers (`struct loadavg`/`vmtotal`/`CTLFLAG_SKIP`, `getloadavg(3)` via `vm.loadavg`, and
-step 5's `LOG_NTP`/`LOG_SECURITY`/`LOG_CONSOLE`) went in with sockets stage 4 (musl `2af0e5a2`). Not done: a kernel API for modules to add variables (`SYSCTL.md`
-§3.6 is a MAY; add it when a module has something to export, `vfs.oxfs` first). `/proc/meminfo`
-still reports `MemFree == MemTotal`; `vm_meter::stats` could feed it.
-
-## 5. syslogd, logger, newsyslog — done (`9056be8`)
-
-As planned, with these details settled in the code (and in the manual pages):
-- Messages from this host (`/dev/log`, `/dev/klog`) are stamped on receipt; musl's `syslog(3)`
-  stamps in UTC. Network messages keep their stamp unless `-T`.
-- Local messages are logged exactly as sent: no pid is added from the sender's credentials
-  (decided by the owner; `LOCAL_CREDS` isn't used).
-- The pid file is `flock`ed (FreeBSD's `pidfile_open`): a second syslogd exits instead of
-  rebinding `/dev/log`. Marks bypass repeat suppression. `#-host` isn't a block (a `#----` banner
-  would be).
-- logger's local path is `syslog(3)` (as FreeBSD's), so the smoke test covers it.
-- newsyslog stamps the newest archive's mtime at rotation and reads it back next run; size,
-  interval and time conditions are OR'd.
-- rcorder now orders `... NETWORKING newsyslog syslogd SERVERS ...`.
-
-Left over: `re_format(7)`, `utmpx(5)` and `syslog(3)` pages, referenced but not written. oxdoc bugs
-found while writing pages: `.Op` inside `.Oo`/`.Oc` on an `.It` line swallows the item's body;
-`dmesg.8`'s `.Sm off`/`.Ql` idiom renders wrong; lint doesn't flag an unknown `.St`.
-
-The original plan:
-
-- `usr.sbin/syslogd` (Rust std): `syslog.conf` parser (FreeBSD format, `include`, blocks,
-  NetBSD-style `name=value` options), inputs `/dev/log` (local datagram), `/dev/klog`, UDP 514;
-  outputs file, `-file`, pipe, `@host`, users (utmpx), `*`, terminals; RFC 3164 and 5424 output;
-  repetition; `SIGHUP`; `-k` translation; `LOCAL_CREDS` for real sender PIDs. The FreeBSD flag
-  set of `SYSLOG.md` §6.2.
-- `usr.bin/logger`, `usr.sbin/newsyslog` (Rust; compression through BusyBox `gzip`/`bzip2`).
-- musl: `LOG_NTP`, `LOG_SECURITY`, `LOG_CONSOLE` are done (musl `2af0e5a2`).
-- `etc/syslog.conf`, `etc/newsyslog.conf`, `etc/rc.d/syslogd`, `etc/rc.d/newsyslog`,
-  `etc/defaults/rc.conf` entries.
-- Tests: host tests of the parsers and formatting; `syslog_syscall_smoke` (`SYSLOG.md` §12.2).
-
-## 6. OpenSSL 3; syslog over TCP and TLS (`SYSLOG.md` §§8.3-8.5)
-
-- Vendor OpenSSL 3.5 LTS (`openssl-3.5.9`) as a submodule at `external/apache2/openssl`, on an
-  upstream release tag with no patches (decided 2026-09-29). The `oxidebsd-x86_64` Configure target
-  lives in our tree and is loaded with `Configure --config=`. `build.rs`: static PIE via musl-gcc,
-  `no-shared no-dso no-afalgeng no-ktls` (musl-gcc defines `__linux__`, so OpenSSL takes its Linux
-  paths), `OPENSSLDIR=/etc/ssl`; install `libssl.a`/`libcrypto.a`/headers into the sysroot, seed
-  `/usr/bin/openssl` and `/etc/ssl/openssl.cnf`. Stamp it like the LLVM builds.
-- asm on. The kernel saves only FXSAVE state (no XSAVE), so OpenSSL's OSXSAVE check must keep it
-  off AVX; the smoke test confirms that.
-- **Done (`d2551f6`)**, dynamically linked rather than static: `libcrypto.so.3`/`libssl.so.3`, the
-  legacy provider as a `dlopen`ed module, a PIE `/usr/bin/openssl`, static archives too. Needed
-  first: biased load of dynamically linked PIEs (`f9fb253`), one musl build for `libc.a` and
-  `libc.so` (`e40cc9f`), file `mmap` at a nonzero offset and the oxfs `shm` inode flag (`026e9ba`).
-  `tests/openssl_syscall_smoke.rs` covers it.
-- `regress/openssl-syscall-smoke`: KATs (SHA-256, AES-GCM, RSA/ECDSA, `RAND_bytes`) and a TLS 1.3
-  handshake over an in-process memory BIO pair (no loopback, no Perl on target).
-- Trust store: vendor Mozilla NSS `certdata.txt` (MPL-2.0), split at build time into
-  `/usr/share/certs/{trusted,untrusted}/*.pem`, honouring its trust/distrust bits (as FreeBSD's
-  `secure/caroot`). `usr.sbin/certctl` (Rust std, `certctl(8)` mdoc page): `rehash`, `list`,
-  `untrust`, `trust`, writing `<subject-hash>.N` links in `/etc/ssl/certs` and `/etc/ssl/cert.pem`.
-  **Done (`31c5c69`, `d33a27d`)**: NSS 3.130, 121 roots; the logic is `lib/libcertstore` (pure
-  Rust, OpenSSL's subject hash reimplemented and checked against the host's `openssl`), shared by
-  `certctl` and `build.rs`, which seeds `/etc/ssl` at build time. Distrust-after dates aren't
-  enforced (as FreeBSD).
-- **Before `openssl-sys`: Rust programs become dynamic PIEs** (decided 2026-09-30), so they link
-  `libssl.so.3` like `/usr/bin/openssl`. `x86_64-unknown-oxidebsd`: `crt-static-default` off, PIE
-  on. The unwinder is `/lib/libgcc_s.so.1` built from LLVM libunwind (+ compiler-rt builtins), as
-  on FreeBSD. pid 1 (`/sbin/init_sh`) stays a static PIE (FreeBSD's `NO_SHARED` init), everything
-  else dynamic. Shared libraries `/bin` and `/sbin` need move to `/lib`: `/lib/libc.so` (the real
-  file, `ld-musl-x86_64.so.1` beside it), `/lib/libgcc_s.so.1`; `/usr/lib/libc.so` a symlink.
-  **Done (`a9b8d5b`, `ab98faf`)**. pid 1 is `/bin/sh` (kernel-embedded), so it and
-  `/sbin/emergency` are the static ones; `init_sh` is dynamic. Needed `--eh-frame-hdr` in
-  musl-gcc (musl `27a3d66f`) for unwinding through shared libraries.
-- Rust binding for syslogd: the `openssl` crate against the sysroot. **Done (`d346cb0`)**:
-  `openssl-sys` needs no patch, just `OPENSSL_DIR` and `CC_x86_64_unknown_oxidebsd`; it links the
-  shared libraries. `regress/std/openssl-rs-smoke` covers it (TLS 1.3 over a `UnixStream` pair).
-- syslogd: RFC 6587 framing, `@@host`, `tcp_server`; RFC 5425 with `@[host]:port(...)`, the
-  `tls_*` options, verification, queueing and reconnect (§8.5). Decided 2026-09-30: all in the
-  existing single `poll(2)` loop, as the BSDs do (non-blocking sockets, OpenSSL's
-  `WANT_READ`/`WANT_WRITE`), no threads; and **a loopback interface first** (`lo0`,
-  `127.0.0.0/8`), so the on-target test runs two syslogds on one machine.
-  **Done (`b07c19d`)**: `usr.sbin/syslogd/src/net.rs`; host tests of two syslogds (TCP, queue and
-  reconnect, TLS with a test CA, a pinned fingerprint, rejections), and on target over lo0.
-- Loopback plan: a small BSD-style interface layer (`sys/net/if.rs`): `lo0` (127.0.0.1/8) and
-  `re0` (the rtl8139, 10.0.2.15/24), a route lookup (loopback for 127/8 and our own addresses,
-  the connected subnet, the default gateway) that picks the interface, next hop and source
-  address; `sys/net/if_loop.rs` queues looped packets, drained by `net::poll` with the waiters
-  woken as the NIC's interrupt does. Sockets gain a real local address: `bind` to a local address
-  or `INADDR_ANY` (else `EADDRNOTAVAIL`), TCP demultiplexes on the full 4-tuple, a listener bound
-  to 127.0.0.1 only hears loopback, `getsockname` reports the real address. IPv4 drops
-  127/8 arriving on re0. `/etc/hosts` with `localhost`. No interface ioctls yet (ifconfig later).
-  **Done (`c22d920`)**; the Ethernet interface is `rl0` (FreeBSD's name for the rtl8139). Also
-  fixed there: TCP dropped data still buffered at `close()`.
-- Open: `SYSLOG.md` §13 (beyond the trust store above).
-
-## 7. cron, crontab, periodic (`CRON.md`)
-
-Four stages, each committed and pushed as it lands:
-1. **Done (`6dc085d`)**: `lib/libcron`, the table parser and Vixie cron 4's clock handling as a
-   pure state machine; 13 host tests. `-o` (default, as FreeBSD) counts minutes in UTC, `-s` in
-   local time, which makes a daylight-saving change a clock jump (§4.5). A field beginning with
-   `*` counts as unrestricted for the day rule (Vixie); `n/step` means `n-max/step`.
-2. **Done (`dc01885`)**: the daemon; login's class code moved into `lib/liblogincap` as
-   `setusercontext` (FreeBSD's flags; `PATH` and the class environment are returned, not set);
-   `rc.d/cron`, `etc/crontab` (newsyslog only until stage 4), `etc/pam.d/cron`. Host tests need
-   `OXIDEBSD_LIBPAM_DIR=<repo>/target/openpam` (OpenPAM is static). Found on the way and fixed
-   (`0d0fbbb`): oxfs never updated a directory's times when an entry was added or removed, so
-   cron never noticed a new `cron.d` table. Found and **not** fixed: a file made by
-   `open(O_CREAT)` always gets gid 0 (only the uid is recorded), while mkdir/mknod/symlink use
-   the creator's gid.
-3. **Done (`c4261e9`)**: `crontab(1)`, which takes BusyBox's `/usr/bin/crontab` slot through
-   the same oxfs name; `cron_syscall_smoke` (21 checks). Not covered: refusing a non-root
-   caller (needs `su` in the test).
-4. **Done (`bb68898`)**: `periodic` and its scripts, `periodic.conf`, the five manual pages,
-   `CRON.md` implemented (§11 there records what the code settled). `cron_syscall_smoke` has
-   35 checks. Not exercised by a test: `daily/110.clean-tmps` (off by default; it relies on
-   BusyBox `find`'s `-mindepth`, `-empty` and `-atime`).
-
-The original plan:
-
-- A shared table parser (a small library crate) used by both programs.
-- `usr.sbin/cron` (Rust std): tables, `cron.d`, reload by mtime, jitter, `@reboot` via
-  `/var/run/cron.reboot`, clock-change handling, login class and PAM service `cron`
-  (`etc/pam.d/cron`), output to syslog, `/var/run/cron.pid`.
-- `usr.bin/crontab` (Rust): root-only until set-user-ID exists (as `passwd`).
-- `usr.sbin/periodic` (sh), `etc/periodic/{daily,weekly,monthly}`, `etc/defaults/periodic.conf`,
-  `etc/crontab`, `etc/rc.d/cron`.
-- Tests: host tests with an injected clock; `cron_syscall_smoke` (`CRON.md` §9.2).
-
-## 8. Time zones — done (`ad62ef1`)
-
-As planned. Settled in the code: zic/zdump are static at fixed bases (`0x11000000`,
-`0x12000000`), since musl's `libc.a` isn't PIC and static PIE for C would need a musl rebuild;
-zdump links tzcode's own `localtime.c` (musl has no `tzalloc`/`localtime_rz`). tzsetup's menus
-show each zone as `City (Country: comment)`. Since the musl batch after it (below), zic, zdump
-and the C fixtures are static PIE, and running programs follow a changed `/etc/localtime` by
-themselves (§5.4 rewritten), so no program reloads the zone on `SIGHUP`.
-
-The original plan:
-
-- Vendor IANA tzdata + tzcode at `external/public-domain/tz`; build `zic` for the host, compile
-  the zones, seed `/usr/share/zoneinfo`; build `zic`/`zdump` for the target; `usr.sbin/tzsetup`
-  (Rust).
-- oxfs's inode count is no longer fixed (`475e995`, `13113f8`), so the zones' ~600 files need
-  no layout change.
-- Running programs follow a changed zone (TIMEZONE.md §5.4, the musl batch).
-- Test: `tz_syscall_smoke`.
-
-## 9. BusyBox roster cut
-
-BusyBox's `dmesg`, `sysctl`, `crond`, `crontab` stop being installed once their replacements
-exist. Editing `build_busybox.rs` costs a ~30-minute BusyBox rebuild: make all four removals in
-one edit, together with any other pending roster change.
-
-## 10. `/sbin/init` (`INIT.md`, step 3)
-
-**First cut (`52656de`)**, asked for ahead of the rest: `sbin/init` runs `/etc/rc`, then a root
-shell on the console, restarted when it exits (3 exits within 5 s pause 30 s); reaps orphans;
-`-s` and `-R` skip rc; `SIGINT`/`SIGUSR1`/`SIGUSR2` do §10's shutdown (hang up the console
-session first, so `rc.shutdown` can take the console). The kernel embeds it (static PIE) and
-starts it without a controlling terminal (`InitProgram::console`); falls back to `/bin/sh` if it
-can't be started. What follows is what's left; the shell loop becomes the ttys/getty loop.
-
-**Part 1 done (2026-10-01):** the §3 states, `/etc/ttys` sessions (getty on `ttyv0`), FreeBSD's
-restart limit, `SIGHUP`/`SIGTERM`/`SIGTSTP`, the single-user password on an insecure console,
-recovery keeping the sessions it finds in `/proc`, `init(8)`, `/etc/profile`. `SIGTERM`'s
-single-user returns to multi-user without `/etc/rc` (decided: services keep running; INIT.md §3).
-Test: `init_syscall_smoke` (about a minute).
-
-**Parts 2-4 done (2026-10-01):** `syslog(3)` with `LOG_CONS` (facility auth); `BOOT_TIME` and
-`SHUTDOWN_TIME` (musl gained `SHUTDOWN_TIME`/`DOWN_TIME` = 11) and closing a killed login's
-record; recovery reports why and starts the `KEYWORD: shutdown` services that aren't running,
-tested through the new `debug.kill_init` sysctl; `init=`/`init_path=` through the embedded
-`start_init` (INIT.md §4.1.1), tested by `init_path_smoke`.
-
-Found on the way and fixed (`poweroff` commit after `98cf1fc`): `poweroff` wrote PM1a control at
-SeaBIOS's port `0x604`, but OVMF's is `0xb004`; `sys/acpi.rs` now reads the FADT and `\_S5`.
-
-- `sbin/init` (Rust std): the states of `INIT.md` §3, `/etc/ttys` sessions with restart limits
-  (FreeBSD's: 3 deaths within 5 s of start → 30 s pause, logged), the signal table (§6), reaping,
-  `rc.shutdown` with `rcshutdown_timeout`, the kill/sync/`reboot(2)` sequence, recovery mode
-  `-R` (§9.3), single-user with the console's `secure` flag, `syslog(3)` with `LOG_CONS`,
-  `utmpx` `BOOT_TIME`/`SHUTDOWN_TIME` (`LOGIN.md` §8.2).
-- Kernel: start `/sbin/init` as process 1 from its embedded image (§9.6), with the boot flags;
-  `init_path=` (colon list, FreeBSD) and `init=` on the command line, falling back to `/bin/sh`;
-  the existing supervision (respawn, `/proc/initdeaths`, emergency) applies to any of them, `-R`
-  only to `/sbin/init`.
-- Tests: boot to a getty; `SIGTERM` to single-user; `rc` failure to single-user; respawn in
-  recovery mode (extend `init_respawn_smoke`); shutdown paths by hand (they end the VM).
-
-## Side work done 2026-09-30
-
-- oxfs: a new entry takes its directory's group (BSD rule) and directories' times move on
-  create/remove (`113d7d9`, `0d0fbbb`).
-- `/bin` and `/sbin` are statically linked, OpenBSD-style (`33a69e6`); `/sbin/nologin` added.
-  Still missing from a BSD `/sbin`: `ifconfig`/`route` (below), `newfs`/`fsck` (oxfs tools),
-  module load/unload tools, `swapon`/`savecore`/`dumpon` (need swap and crash dumps first).
-- Rewritten in Rust std (`bc401ba`, `8a7d30a`): `sleep sync link unlink rmdir nproc kill test`
-  (`[`) `chmod`, and `mount`/`umount` over the new `nmount(2)` (584) with `/etc/fstab` and
-  `rc.d/mountcritlocal`. Still BusyBox in `/bin` (17): `ash` (stays for `configure`), `date stty dd
-  df expr pgrep pkill`, `grep egrep fgrep sed ed` (regex library first), `tar gzip gunzip zcat`;
-  in `/sbin`: `mknod ping`. BusyBox's `mount`/`umount` left the roster with musl's `nmount()`
-  (2026-10-01), on which musl's `mount(3)` is now built; syscalls 174/175 are gone.
-
-## Found 2026-09-30, not yet fixed
-
-- **`execve` reads the executable 512 bytes per `read`** (`lifecycle::read_fd_to_end_and_close`,
-  through `exec_image`), so exec of a large program (clang, ld.lld: tens to hundreds of MB) costs
-  hundreds of thousands of system calls. bmake's `configure` on target takes ~14 minutes for this
-  reason (4 s on the host). Fix first: read in large chunks or map the file.
-- `wget` over TCP is slow (stop-and-wait); a 4 MB download takes minutes. BusyBox `tar` has no
-  gzip support (`tar xzf` fails; `gunzip -c | tar xf -` works) -- matters for the floppy plan's
-  `.tgz` sets, and for the native `tar`.
-- `/bin/sh` runs autoconf `configure` (bmake on target; bmake, nano, ncurses on the host identical
-  to dash), so `ash` is no longer needed for that.
-
-## After step 3
-
-Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` for
-`<name>_restart`; the `LOGIN.md` leftovers (`tty01` serial tests, `who`).
-
-## Traps and methods
+## 5. Traps and methods
 
 - **Build caching**: a musl change used to leave `std` programs and oxfs's embedded copies stale.
   Fixed in `build.rs` (stale executables relinked, `OXIDEBSD_EMBED_STAMP`); if in doubt,
@@ -331,16 +60,16 @@ Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` f
   std_thread_net_signal_oxidebsd_syscall_smoke sh_syscall_smoke at_syscall_smoke
   sysctl_syscall_smoke sysctl_tunables_smoke tty_syscall_smoke init_respawn_smoke fork_wait`.
   After a musl change also `POSIX_PILOT_CANARY_ONLY=1 cargo tv --test posix_conformance_smoke`,
-  compared per file with `target/canary_run3.log` (127/173 pass, 2026-09-28).
-- Build logs contain the POSIX pilot's expected per-file compile errors (53 skipped files);
-  filter for `panicked at`, `could not compile`, `^error:` instead.
+  compared per file with `target/canary_run3.log` (current numbers: `POSIX_COMPLIANCE_CHECKLIST.md`).
+- Build logs contain the POSIX pilot's expected per-file compile errors; filter for
+  `panicked at`, `could not compile`, `^error:` instead.
 - A test that uses socket calls must load the `socket` module (`socketpair`/`shutdown` moved
   there from `posix_compat`). A test using the network must call `rtl8139::init` before loading
   modules: the card's DMA addresses are 32-bit, and after oxfs's pools the driver refuses.
-- `spin::Mutex` is not re-entrant: a second `STATE.lock()` while a guard is alive spins forever
-  (found in TCP's `detach`). A hang: sample it with gdb through the QEMU monitor
-  (`OXIDEBSD_QEMU_MONITOR=<port>`, monitor command `gdbserver tcp::<port>`, then `addr2line`
-  against the test ELF under `target/x86_64-oxidebsd/debug/build/oxidebsd/*/out/`).
+- `spin::Mutex` is not re-entrant: a second `STATE.lock()` while a guard is alive spins forever.
+  A hang: sample it with gdb through the QEMU monitor (`OXIDEBSD_QEMU_MONITOR=<port>`, monitor
+  command `gdbserver tcp::<port>`, then `addr2line` against the test ELF under
+  `target/x86_64-oxidebsd/debug/build/oxidebsd/*/out/`).
 - musl: `__syscall(...)` counts its arguments; a compound literal passed to it must be
   parenthesized (braces don't protect commas). Never write the macro prefix `__NR_` in a
   `syscall.h.in` comment. Check new `__NR_*` names and numbers for collisions.
@@ -348,9 +77,8 @@ Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` f
 - **A musl change relinks all of BusyBox** (about 40 minutes, since `libc.a` gets newer). Batch
   musl edits into one change. The canary (above) then has to be rerun too.
 - **A persistent disk keeps what it was seeded with**: `target/oxfs_disk.img` is mounted, never
-  reseeded, so new files in `/etc`, `/sbin`, `/dev` or rebuilt BusyBox applets only appear after
-  deleting it (the owner has OK'd that; it reformats in seconds). Tests always use a fresh disk.
-  A symptom seen: `wget` failing with "unrecognized syscall number 142" from a stale applet.
+  reseeded, so new files in `/etc`, `/sbin` or rebuilt BusyBox applets only appear after deleting
+  it (the owner has OK'd that; it reformats in seconds). Tests always use a fresh disk.
 - **Driving a live boot headlessly**: `OXIDEBSD_QEMU_MONITOR=45454 OXIDEBSD_QEMU_DISPLAY=none
   cargo rv > run.log 2>&1` in the background, wait for `switching to pid 1` in the log, then
   `scripts/qemu_sendkeys.py 45454 'command' ...`. Note the log's size before sending and read from
@@ -363,10 +91,9 @@ Interface configuration ioctls and `rc.d/netif`; `/sbin/initconf`; `daemon(8)` f
   number: it logs `unrecognized syscall number N`, once per number.
 - `poll`/`select`/`ppoll` are registered by the `socket` module: a test that polls anything (a
   pipe, `/dev/klog`) must load it, or `poll` is `ENOSYS`.
-- oxfs buffers writes per descriptor; since `2e49de9` a lookup, open or read through another
-  descriptor commits them first. A new path into file contents that bypasses those three (a new
-  syscall reading an inode directly) must call `force_commit_pending_writes` too.
-- **Every syscall-reachable change gets a test first-run before believing it**: this session's own
-  test expectations were wrong four times (two gc cases, a control-buffer size, a weekday) and the
-  kernel right; and the kernel was wrong once (an overflow in `kern.msgbuf`'s read, a kernel panic
-  any user could trigger). Check which it is before changing either.
+- oxfs buffers writes per descriptor; a lookup, open or read through another descriptor commits
+  them first (`2e49de9`). A new path into file contents that bypasses those three (a new syscall
+  reading an inode directly) must call `force_commit_pending_writes` too.
+- **Run every syscall-reachable change's test before believing either side**: a failing check can
+  be a wrong expectation in the test as easily as a kernel bug. Check which it is before changing
+  either.

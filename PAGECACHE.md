@@ -1,6 +1,7 @@
 # OxideBSD read-only page cache: design specification
 
-Status: **implemented** (2026-10-01, `sys/memory/pagecache.rs`). Target release: v0.3.0.
+Status: **implemented** (2026-10-01, `125a3c4`, `2faef90`; `sys/memory/pagecache.rs`). Target
+release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.

@@ -1,6 +1,6 @@
 # OxideBSD system logging: design specification
 
-Status: **implemented** (TCP and TLS, §§8.3-8.5, in 2026-09-30). Target release: v0.3.0.
+Status: **implemented** (2026-09-30, `b07c19d`). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `syslogd(8)`, `syslog.conf(5)`,
@@ -31,12 +31,12 @@ before the log daemon runs.
 | `/etc/rc.d/syslogd`, `/etc/rc.d/newsyslog` | Start-up | `etc/rc.d` |
 | `libssl`, `libcrypto`, `<openssl/*.h>`, `/usr/bin/openssl` | The system TLS library, first used here (§8.4) | OpenSSL 3, `external/apache2/openssl` |
 
-BusyBox's `dmesg` stops being installed.
+BusyBox's `dmesg` is not installed.
 
 ## 3. Kernel message buffer
 
-3.1. The kernel MUST keep every message it prints in a 64 KiB circular buffer, in addition to
-printing it. When the buffer is full the oldest bytes are overwritten.
+3.1. The kernel MUST keep every message it prints in a circular buffer of `kern.msgbufsize` bytes
+(default 64 KiB, a boot tunable, `SYSCTL.md` §6.3), in addition to printing it. When the buffer is full the oldest bytes are overwritten.
 
 3.2. Each line in the buffer is stored as the kernel printed it. A line from code that gives a
 priority is stored with a `<N>` prefix, `N` being the `syslog(3)` priority; a line without one is
@@ -264,6 +264,6 @@ program block route correctly; a pipe action receives its lines; `SIGHUP` reopen
 
 ## 13. Open questions
 
-1. ~~A system bundle of trusted certificate authorities.~~ Settled: `/etc/ssl/cert.pem` and
+1. A system bundle of trusted certificate authorities. Settled: `/etc/ssl/cert.pem` and
    `/etc/ssl/certs`, maintained by `certctl(8)`, are OpenSSL's defaults, so a TLS action with no
    `tls_ca`/`tls_cadir` verifies against them.

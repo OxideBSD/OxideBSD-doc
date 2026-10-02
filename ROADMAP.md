@@ -1,257 +1,152 @@
-# OxideBSD Roadmap
+# OxideBSD releases: roadmap
 
-OxideBSD is a 100% Rust BSD-like operating system. The plan is three phases, each a prerequisite
-for the next.
+Status: **v0.3.0 in progress** (2026-10-01, `946dfa0`). Latest release: v0.2.0 (tag `v0.2.0`,
+2026-09-16).
 
-## Phase 1 — Minimal environment: a running, interactive kernel
+Superseded narrative and per-session progress notes from earlier versions of this file are in
+`HISTORY.md`. POSIX conformance numbers are recorded only in `POSIX_COMPLIANCE_CHECKLIST.md`.
 
-**Goal:** a kernel that boots, stays up, and gives you a shell to type into — not just a kernel
-that boots and halts.
+## 1. Phases
 
-**Status:** done. GDT/TSS/IDT with a dedicated double-fault stack, PIC-driven interrupts (timer +
-keyboard), a heap allocator, a VGA console, and a real interactive shell all exist — see
-`CLAUDE.md` for full detail. (`stsh`, the original hand-written shell described below, has since
-been superseded as pid 1 by BusyBox's `hush` — see Phase 2.)
+The long-term plan has three phases, each a prerequisite for the next.
 
-Milestones, roughly in dependency order:
+| Phase | Goal | Done when | State |
+|---|---|---|---|
+| 1. Interactive kernel | Boot, stay up, take input in a shell. | The kernel boots into a shell and stays responsive. | Done |
+| 2. Rust programs on OxideBSD | Run separate programs the kernel loads; finally `rustc`/`cargo` as userland. | `rustc` runs as an OxideBSD process and compiles a program. | In progress: paging, ring 3, ELF loading, the syscall ABI, oxfs, the musl port and the `x86_64-unknown-oxidebsd` Rust `std` target are done; `rustc` on target is v0.6.0. |
+| 3. Self-hosting | An OxideBSD instance builds a bootable OxideBSD image with no host OS. | Boot an image, rebuild OxideBSD from source on it, boot the result. | Not started for the Rust toolchain; C-side toolchain components (Clang/LLVM, C++, bmake, ninja) already run on target. |
 
-- **CPU structures** — GDT, TSS, IDT, with exception handlers and a separate stack for double
-  faults (a bug here otherwise triple-faults and silently reboots the VM).
-- **Interrupts** — PIC (or APIC) initialization, a timer tick (PIT or APIC timer), and a keyboard
-  IRQ handler.
-- **Heap allocation** — a global allocator so `alloc` (`Vec`, `String`, `Box`, ...) is usable; a
-  lot of later work assumes this exists.
-- **Console output** — VGA text-mode buffer as the primary display (serial has been the console so
-  far and can remain the logging/debug channel).
-- **Keyboard input** — scancode-to-keycode translation (e.g. via the `pc-keyboard` crate) feeding
-  a line-editing input buffer.
-- **Shell** — a command loop that reads a line, dispatches to a small set of built-ins (`help`,
-  `echo`, memory/heap stats, a deliberate panic for testing the panic handler, etc.), and loops
-  forever instead of halting.
+Phase 2 took a C libc route first: musl ported to the native syscall ABI, which let BusyBox and
+Clang/LLVM run as userland, before the Rust `std` target.
 
-Phase 1 is "done" when the kernel boots into that shell and stays responsive to input indefinitely
-— met.
+## 2. Release sequence
 
-## Phase 2 — Getting Rust running on it
+Decided 2026-09-04: the former single "v0.2.x goals" list is split into sequential releases, each
+shipped on its own. v0.5.0 onward added 2026-09-12.
 
-**Goal:** run actual Rust programs under OxideBSD — not the kernel binary itself, but separate
-programs the kernel loads and executes. The end target of this phase is running `rustc`/`cargo`
-themselves as userland programs.
+| Release | Theme | State |
+|---|---|---|
+| v0.2.0 | POSIX pilot conformance | Released 2026-09-16 |
+| v0.3.0 | Toolchain maturity, `std`, init, cleanup, sudo | In progress |
+| v0.4.0 | glibc port, oxlibc backing `std` | Not started |
+| v0.5.0 | SMP | Not started |
+| v0.6.0 | `rustc`/`cargo` self-hosted on target | Not started |
+| v0.7.0 | oxlibc | Partly pulled into v0.4.0 |
+| v0.8.0 | Graphics | Groundwork only |
+| v0.9.0 | Hardware support | Not started |
+| v0.10.0 | Package manager | Not started, not designed |
+| v0.11.0 | v1.0.0 preparation | Scope not defined |
+| v1.0.0 | First stable release | — |
 
-**Status:** far along, but not "done" by this phase's own stated bar. Every milestone below is
-built except the last — a C libc (musl), not a Rust `std` port, ended up being the actual
-libc/userland story that got this phase moving (see `CLAUDE.md`'s musl-port section), and
-`rustc`/`cargo` running as OxideBSD processes hasn't been attempted yet. Current work (v0.2.0
-closing the POSIX pilot gap, v0.3.0/v0.4.0 deepening the C-toolchain side of userland with
-GCC/Clang and glibc — see "Release sequence" below) is deepening the existing C-based userland
-story rather than attacking `rustc`/`std` directly — a deliberate detour, not abandonment of this
-phase's actual goal.
+## 3. Releases
 
-Depends on phase 1's interactivity, plus:
+### 3.1. v0.2.0: POSIX pilot conformance
 
-- **Paging / address spaces** — real virtual memory, one address space per process, page fault
-  handling. Done.
-- **User/kernel privilege separation** — ring 3 execution, a context switch between processes.
-  Done.
-- **ELF loading** — load a separate binary from somewhere and execute it as a process. Done.
-- **Syscall ABI** — a defined interface for user programs to ask the kernel for services (I/O,
-  memory, process control). Done — OxideBSD's own native ABI, see `CLAUDE.md`'s Syscall ABI
-  section.
-- **A filesystem** — at minimum something to load programs from; doesn't need to be persistent to
-  start (an in-memory/initrd-style filesystem is a reasonable first cut). Done and then some —
-  `oxfs`, a real Unix-shaped inode/block filesystem with optional disk persistence, superseded an
-  earlier, more limited FAT32 implementation.
-- **A libc/std story for userland** — either a `#![no_std]`-only userland to start, or porting
-  `std` to a custom `x86_64-unknown-oxidebsd` target (the harder but more useful path, since
-  `rustc`/`cargo` assume `std`). Landed differently than either option here: a real port of musl
-  (a C libc) to this kernel's native syscall ABI, which in turn let BusyBox and a real C compiler
-  (`tcc`) run as userland. A Rust `std` port remains undone and is what this phase's "done" bar
-  below still actually requires.
+Released 2026-09-16.
 
-Phase 2 is "done" when `rustc` can run as an OxideBSD process and compile a program — not yet met.
+- Scope: close the gap between OxideBSD's Open POSIX Test Suite pilot run (the full corpus, via
+  `scripts/run_posix_pilot_supervised.sh`) and a real Unix baseline.
+- Target (set 2026-09-08): >91% raw pass rate and >95% excluding UNTESTED. Measured results:
+  `POSIX_COMPLIANCE_CHECKLIST.md`.
+- The comparison target is UNIX and the BSDs (FreeBSD, NetBSD, OpenBSD). Linux/glibc
+  (`scripts/run_posix_pilot_host.sh`) is used only because it is the host available; a BSD-host
+  run of the same corpus is not yet scheduled.
+- Full POSIX system call coverage (every POSIX-mandated call, on this ABI's own numbers and
+  shapes) is part of the same work, not a separate goal.
 
-## Phase 3 — Self-hosting: OxideBSD builds itself
+### 3.2. v0.3.0: toolchain maturity, `std`, init, cleanup, sudo
 
-**Goal:** close the loop — an OxideBSD instance can build a new, bootable OxideBSD image using
-only tools running under OxideBSD itself, with no host OS involved.
+Scope decided 2026-09-23 (items 1-3), extended 2026-09-24 (items 4-5).
 
-**Status:** not started on the Rust-toolchain side this phase originally describes. The v0.3.0/
-v0.4.0 goals below are a first step toward self-hosting from the C side instead — self-hosting
-C-side toolchain components, retiring `tcc` for real GCC/Clang, and a real glibc port — ahead of,
-not instead of, eventually closing this loop for `rustc`/`cargo` themselves.
+| # | Item | State |
+|---|---|---|
+| 1 | GCC as an on-target port. | Not started |
+| 2 | Finish the Rust `std` target: the surface a `/bin` utility needs, verified by a `std` coverage consumer; `std` binaries are PIEs; the native `bin/` utilities rewritten as `std` apps. | In progress: target landed 2026-09-17 (private forks `OxideBSD/rust-oxidebsd` and `OxideBSD/libc-crate-oxidebsd`, branch `oxidebsd`); dynamic PIEs on `/lib/libc.so` and `/lib/libgcc_s.so.1` since 2026-09-30 (`ab98faf`), `/bin` and `/sbin` static (`33a69e6`); `bin/` rewrite partly done (`bc401ba`: sleep, sync, link, unlink, rmdir, nproc, kill, test, chmod), the 12 original oxlibc utilities remain. |
+| 3 | Native init: `/sbin/init` as a Rust `std` app, `/etc/rc`, `rc.d`, `rcorder`, `rc.conf` (`INIT.md`). | Done (`52656de`, `3e3241e`, `6899d9d`, `3295c7c`, `946dfa0`) |
+| 4 | Cleanup: OxideBSD acts like a regular OS instead of taking shortcuts. Inventory: `CLEANUP.md`. | In progress |
+| 5 | `sudo` via sudo-rs, with the kernel credentials, `/dev/tty`, pseudo-terminals and OpenPAM it needs; sudo-rs's `su` replaces BusyBox's (`SUDO.md`). | In progress: OpenPAM, getty, login and `/dev/tty` done (`093ec0e`, `fde98f6`); POSIX credentials, setuid exec and pseudo-terminals not started. |
 
-- The full build toolchain (`rustc`, `cargo`, a linker, an assembler) running as userland programs.
-- Enough of a POSIX/BSD-like surface (process spawning, file I/O, environment variables, pipes)
-  for that toolchain to actually function, not just execute trivial programs.
-- Build tooling to fetch/vendor the kernel and userland source trees and drive a full rebuild from
-  within the running OS.
-- A working bootstrap: boot an OxideBSD image, rebuild OxideBSD from source on it, boot the result.
+Decisions:
 
-## Release sequence: v0.2.0 → v0.3.0 → v0.4.0 → v0.5.0 → v0.6.0 → v0.7.0 → v0.8.0 → v0.9.0 → v0.10.0 → v0.11.0 → v1.0.0
+- 2026-09-14: `rustrc` (AGPLv3, OpenRC-inspired) dropped in favour of a native BSD-style init and
+  `rc.d`. **Rationale.** AGPLv3 conflicts with the project's permissive licensing, and `rustrc` was
+  too generic.
+- 2026-09-17: `std` links against the musl fork rather than a from-scratch syscall backend, and
+  reuses `std::sys::pal::unix`; `target_os = "oxidebsd"` is a real target identity, listed in
+  `library/std/build.rs`'s supported platforms (no `restricted_std`). Panics unwind.
+- 2026-09-23: Clang rebuilding itself on target is not v0.3.0. **Rationale.** It needs Python
+  (LLVM's CMake) and CMake, which come later.
 
-As of 2026-09-04, the old single "v0.2.x goals" bucket below is split into separate, sequential
-releases — each ships standalone rather than bundling everything into one v0.2.0. v0.5.0 onward
-(added 2026-09-12) reflects the user's own longer-term plan past the original three-release split.
+Landed in this cycle: the C++ stage (libc++, on-target `clang++`), the `*at()` family, `ppoll(2)`,
+demand-grown user stacks, ninja on target; terminals with a line discipline (`TTY.md`); devfs
+(`DEVFS.md`); oxfs inode and block reclamation; OpenSSL 3.5 LTS with the system trust store
+(`certctl(8)`) and the `openssl` crate; dynamic linking and `dlopen`; the loopback interface
+(`UNIX.md` §11.4); syslog over TCP and TLS (`SYSLOG.md` §8); cron; time zones; a read-only page
+cache (`PAGECACHE.md`). Placement of every binary: `HIER.md`.
 
-- **v0.2.0 — POSIX pilot compliance.** The current focus. **Concrete target (set 2026-09-08):
-  >91% raw pass rate, >95% excluding UNTESTED**, on the full corpus via
-  `scripts/run_posix_pilot_supervised.sh`. Close as much of the gap as practical
-  between OxideBSD's own Open POSIX Test Suite pilot run and a real Unix baseline, using the full
-  ~1687-file corpus (not a curated subset — see `CLAUDE.md`'s "POSIX pilot: full corpus expansion"
-  section) as the measuring stick. **The real comparison target is literal UNIX and the BSDs
-  (FreeBSD/NetBSD/OpenBSD), not Linux** — Linux/glibc is only used today because it's the one host
-  actually available to measure against (`scripts/run_posix_pilot_host.sh`, manual/root-only); a
-  real BSD-host run of the same corpus would be a truer number and isn't slotted yet (needs a BSD
-  box/VM to run it on). Latest measured OxideBSD baseline (2026-09-07, a fresh `--reset`
-  full-corpus run, `scripts/run_posix_pilot_supervised.sh`): **87.4%** raw pass rate / **92.8%**
-  excluding UNTESTED (1474 PASS / 1686 total; 22 FAIL / 39 UNRESOLVED / 14 CRASH / 11 TIMEOUT / 29
-  UNSUPPORTED / 97 UNTESTED — `shm_open/23-1.c` needed excluding again, a known, real single-core
-  scheduling-throughput limit, not a new bug). **Newer baseline (2026-09-15, no exclusions
-  needed)**: **90.3%** raw / **94.6%** excluding UNTESTED (1523 PASS / 1687 total) — within a point
-  of the target on both axes. A few more fixes have landed since (`mlockall/3-7.c`, the ACPI HPET
-  overlay closing `timer_getoverrun/2-2.c`, a `timer_gettime` precision fix) that haven't yet been
-  folded into an official re-run. Last real host-side comparison (2026-09-06, not re-run since):
-  the user's Artix (glibc/Linux) host at **89.5%** / **94.3%** — OxideBSD has now passed that
-  proxy figure on both axes. Closing the remaining gap to the concrete target means triaging the
-  full corpus's own remaining FAIL/UNRESOLVED set, not growing the corpus further — it's already
-  complete. Several clusters already ruled out as real, accepted (non-kernel) issues rather than
-  bugs to fix — see `CLAUDE.md`'s own history for detail: `sigaction/17-{2,10,20,25,26}.c`'s FAILs
-  were transient host-load timing flakiness; `aio_suspend`'s/`aio_cancel`'s remaining UNRESOLVEDs
-  are a real oxfs file-size-cap gap and an inherent test-timing race respectively; a dozen-plus
-  pthread `CRASH`es are a confirmed real, pre-existing musl 1.2.6 UAF design trait (reproduced
-  against unmodified host musl, not an OxideBSD bug); the last 3 scheduler-shaped hangs
-  (`fork/18-1.c`, `pthread_mutex_init/{1,3}-2.c`) are likewise confirmed real, pre-existing musl
-  bugs, not OxideBSD's. **Full POSIX syscall coverage** (every POSIX-mandated syscall, even where
-  this ABI's own number/shape — see `CLAUDE.md`'s Syscall ABI section — diverges from Linux's or
-  any real BSD's; not a promise to match Linux/BSD numbering or wire format) falls out of this same
-  push, not a separate goal.
-- **v0.3.0 — GCC and Clang self-hosted ports, plus a real Rust `std` target.** What v0.2.0 used to
-  target before the 2026-09-04 re-scope (see `CLAUDE.md`'s TinyCC section for why this is a much
-  bigger lift than TinyCC — real subprocess pipelines, likely real dynamic linking and threads
-  beyond what exists today): self-hosting C-side toolchain components running on-target (moving
-  further into Phase 3's "build itself" goal from the C side first), then retiring `tcc` once both
-  GCC and Clang are real, working on-target ports — TinyCC was always the first/easiest target,
-  never the intended long-term C compiler. **Deferred into this same "toolchain maturity" release
-  (2026-09-09)**: a real Rust `std` target for OxideBSD userland — originally motivated by
-  `rustrc`, an AGPLv3, OpenRC-inspired init system the user was evaluating; **that plan changed on
-  2026-09-14** — `rustrc` was dropped (AGPLv3 conflicts with this project's permissive-licensing
-  direction, and it was "too generic" for OxideBSD's own needs anyway) in favor of a native,
-  from-scratch BSD-style init+rc.d system, matching FreeBSD/NetBSD/OpenBSD's own convention, built
-  directly against this kernel's native ABI rather than through a hosted `std` target. The `std`
-  target work itself is still worth doing here — it unblocks any future real-world Rust crate with
-  a crates.io dependency tree, not just the no-longer-relevant `rustrc` case. **Underway as of
-  2026-09-17**, and landing faster than expected: the recommended approach below turned out right
-  — `std` links against the existing musl fork rather than a from-scratch syscall backend, and
-  almost none of `std::sys::pal::unix` needed a new backend at all. A private `rust-lang/rust` fork
-  (`OxideBSD/rust-oxidebsd`, `oxidebsd` branch) plus a private `libc` crate fork
-  (`OxideBSD/libc-crate-oxidebsd`, `oxidebsd` branch, patched in via `library/Cargo.toml`'s
-  `[patch.crates-io]`) add `target_os = "oxidebsd"` throughout std's own existing
-  `linux`/musl-shaped cfg gates — a real, genuine target identity (confirmed via
-  `std::env::consts::OS`), not borrowed Linux identity. `library/std/build.rs`'s
-  supported-platform allowlist now lists `oxidebsd` too, so consumer binaries need no
-  `#![feature(restricted_std)]` — a real Tier-3-shaped target, not one std merely tolerates.
-  Verified end to end via two real `fork`+`execve`+`wait4`-driven boot tests
-  (`tests/std_hello_oxidebsd_syscall_smoke.rs`, `tests/std_process_fs_oxidebsd_syscall_smoke.rs`):
-  real `println!`/`process::exit`, and real `std::fs` (write/read_to_string/remove_file) +
-  `std::process::Command` (its own internal fork+execve+waitpid, spawning `/bin/true`/`/bin/echo`).
-  Two more real std platform-allowlist gaps found and fixed the same way as `restricted_std` along
-  the way — `sys/pipe/unix.rs`'s `pipe2` list and `sys/fd/unix.rs`'s `set_cloexec` list both
-  defaulted to a fallback (`pipe()`+`ioctl(FIOCLEX)`) that doesn't work here (`ioctl(2)` only
-  handles `TCGETS`/`TCSETS*`/`TIOCGWINSZ`/`TIOCSWINSZ` against the real console); fixed by routing
-  `oxidebsd` into the same real `pipe2(O_CLOEXEC)`/`fcntl(F_SETFD, FD_CLOEXEC)` paths `linux`
-  already uses (both genuinely supported by this kernel's own `pipe2(2)`/`fcntl(2)`). Threads,
-  signals and `std::net` socket plumbing have since been exercised through `std` too
-  (`std-thread-net-signal-oxidebsd`). Still a hand-maintained pair of private forks, not anything
-  upstreamable. Panics unwind (`panic_unwind`, `catch_unwind` tested).
+### 3.3. v0.4.0: glibc and oxlibc
 
-  **v0.3.0 scope, decided 2026-09-23:** (1) **GCC** as a real on-target port (not started);
-  (2) **finish `std`** -- the whole surface a `/bin` utility needs, verified by a std coverage
-  consumer, **PIE** std binaries -- since 2026-09-30 dynamically linked on `/lib/libc.so` and
-  `/lib/libgcc_s.so.1` (LLVM libunwind), pid 1 alone a static PIE -- and the 12 native `bin/`
-  utilities **rewritten as std apps**; (3) a native
-  **init system** -- `/sbin/init` as a Rust std app, FreeBSD/NetBSD-style `/etc/rc` + `rc.d` +
-  `rcorder` + `rc.conf`, replacing `hush` as pid 1. Clang *rebuilding itself* on-target is **not**
-  v0.3.0: it needs Python (LLVM's CMake) and CMake, which move later. Landed toward it already: the
-  C++ stage (libc++, on-target `clang++`), the whole `*at()` family, `ppoll(2)`, demand-grown user
-  stacks, and ninja on-target (see `CLAUDE.md`); and, 2026-09-30, OpenSSL 3.5 LTS with the
-  system trust store (`certctl(8)`), the `openssl` crate, dynamic linking with `dlopen`, the
-  loopback interface (`UNIX.md` §11.4), and syslog over TCP and TLS (`SYSLOG.md` §8). Placement of every binary: `HIER.md`.
+Decided 2026-09-23.
 
-  **Added 2026-09-24:** (4) **a cleanup phase** -- OxideBSD should *act like a regular OS* rather
-  than take shortcuts; every known shortcut and its target is inventoried in `CLEANUP.md`;
-  (5) **`sudo` via sudo-rs**, with the kernel credentials, `/dev/tty`, pseudo-terminals and
-  OpenPAM it needs (`SUDO.md`); sudo-rs's `su` replaces BusyBox's. Since then pid 1 is OxideBSD's
-  own interactive `/bin/sh` (`lib/libsh`), not hush -- `/sbin/init` (item 3) replaces it next.
-- **v0.4.0 — a real glibc port**, alongside (not replacing) the existing native-ABI musl port.
-  **Decided 2026-09-23:** a *full* glibc port (a `sysdeps/` port to OxideBSD's native ABI), for
-  **source** compatibility with glibc-only software -- chosen over an Alpine-style compatibility
-  layer on musl. Needs v0.3.0's GCC, and Python (glibc's build uses it). Also in v0.4.0: a batch of
-  userland work, and **oxlibc pulled forward** from v0.7.0 -- grown from scratch in `lib/oxlibc`
-  until `std` on `x86_64-unknown-oxidebsd` can run on it instead of musl, with no change to the
-  std-based utilities.
-- **v0.5.0 — SMP.** Real multi-core support. A substantial architectural undertaking, not a
-  bolt-on: huge parts of this codebase currently lean on "single core" as a real correctness
-  argument, not just a performance ceiling — `IA32_SFMASK` clearing `IF` for a syscall's entire
-  duration is the *entire* lock-safety reasoning behind most of this kernel's `spin::Mutex` usage
-  (see `CLAUDE.md`'s syscall-ABI section), and several already-landed fixes (the scheduler-race
-  fix in "Closing a real scheduler race...", `sched_yield/1-1.c`'s own resolution) explicitly
-  depend on there being only one core to preempt at all. Real work: per-CPU GDT/TSS/IDT and
-  kernel-stack state, genuine SMP-safe locking once two cores can actually execute kernel code
-  simultaneously (not just take turns via preemption), ACPI/MADT parsing to discover other cores,
-  a real AP (application processor) boot/startup sequence, and IPI-based scheduling/TLB shootdown.
-  Not started.
-- **v0.6.0 — self-hosting `rustc`/`cargo` on-target.** Distinct from v0.3.0's Rust `std` target
-  (which only lets Rust *programs* run on OxideBSD, for `rustrc`'s sake): this is Phase 3's own
-  "OxideBSD builds itself" goal, closed from the Rust side specifically — a real `rustc`+`cargo`+
-  linker+assembler toolchain running *as OxideBSD userland processes*, capable of rebuilding
-  OxideBSD's own kernel and userland from source, on-target, with no host OS involved. v0.3.0's
-  `std` target work is the direct prerequisite this builds on (rustc/cargo are themselves real
-  `std`-using Rust programs). Not started.
-- **v0.7.0 — `oxlibc`.** OxideBSD's own from-scratch native libc (BSD-3-Clause licensed — a
-  deliberate licensing choice, not a fork of `relibc` or anything else with different terms),
-  standing alongside the existing vendored musl/glibc ports rather than replacing them outright.
-  Long-term/deferred until this point in the sequence; not started. **Partly pulled into v0.4.0
-  (2026-09-23)** -- see there.
-- **v0.8.0 — the graphical update: more advanced graphics.** Builds directly on real
-  groundwork already landed ahead of this release: a real `/dev/fb0` character device
-  (`process::mm::do_mmap_fb` maps the actual framebuffer's physical MMIO frames into a userland
-  process) and a real, general-purpose raw keyboard-event source (`SYS_GET_KEYEVENT`,
-  `console::keyevents`) — both deliberately built as general infrastructure, not specific to any
-  one program, and proven end-to-end by a real, playable port of Doom (via `doomgeneric`,
-  `third_party/doomgeneric`). This future release is where that groundwork grows into something
-  closer to a real desktop environment: real mouse support (currently entirely absent — no mouse
-  driver exists anywhere in this kernel, PS/2 or USB), a real windowing/compositing model, and
-  real display-mode negotiation beyond whatever Limine's boot-time GOP/VBE choice happens to be.
-  Not started beyond the v0.2.0-era groundwork above.
-- **v0.9.0 — the hardware support update.** Broader real hardware support by porting drivers from
-  Linux/BSD sources (**license terms need real, per-driver scrutiny** — not a blanket "copy it
-  over," since Linux's GPL and the BSDs' own licenses aren't interchangeable with this project's
-  own). This is also the real-hardware readiness gate for actually switching the user's own
-  Surface Pro over to OxideBSD as a daily driver (see `CLAUDE.md`'s USB/xHCI section — the Surface
-  has no PS/2 controller at all, already closed — real WiFi/networking hardware and real graphics
-  acceleration are the remaining pieces this release would need to close). Not started.
-- **v0.10.0 — the package manager update.** A real package manager — no such infrastructure exists
-  anywhere in this project today (BusyBox/tcc/musl/etc. are all baked into the kernel image itself
-  via `build.rs`, not independently installable). Not started, not yet designed.
-- **v0.11.0 — v1.0.0 prep.** A stabilization/hardening pass ahead of a real 1.0 release; specific
-  scope not yet defined.
+- A full glibc port (a `sysdeps/` port to the native ABI), alongside the musl port, for source
+  compatibility with glibc-only software. Chosen over an Alpine-style compatibility layer on musl.
+  Needs v0.3.0's GCC, and Python (glibc's build uses it).
+- oxlibc pulled forward from v0.7.0: grown from scratch in `lib/oxlibc` until `std` on
+  `x86_64-unknown-oxidebsd` runs on it instead of musl, with no change to the `std`-based
+  utilities.
+- A batch of userland work (not yet itemized).
 
-A separate idea — replacing some BusyBox utilities with Rust `uutils` ahead of GCC/Clang — was
-raised and set aside: not a real dependency of GCC/Clang bring-up (unrelated subsystems), just a
-possible future nice-to-have, not currently sequenced into this list.
+### 3.4. v0.5.0: SMP
 
-**Real text editors: `nano` and real `vim`** — BusyBox's roster today only has the small `vi`
-applet (see `BUSYBOX_APPLETS.md`); `nano` and full (non-BusyBox) `vim` are separate ports, for
-meaningfully better on-target text editing than the current applet-only story — not yet slotted
-into a specific release above.
+Real multi-core support. Much of the kernel's lock-safety argument is single-core (`SFMASK`
+masking interrupts for a whole system call), so this is an architectural change. Scope: per-CPU
+GDT/TSS/IDT and kernel stacks, SMP-safe locking, ACPI/MADT parsing to find the other cores, AP
+startup, IPI-based scheduling and TLB shootdown.
 
-**`SCHED_SPORADIC` (POSIX Sporadic Server)** — the real-time scheduling policy behind
-`sched_setscheduler`/`sched_setparam`'s 13 `UNSUPPORTED` `_POSIX_SPORADIC_SERVER`-gated
-conformance files: a thread alternates between a normal and a low priority based on a real
-execution-time budget/replenishment-period pair, bounding an aperiodic task's CPU share without
-breaking periodic real-time schedulability analysis (an RTOS-space feature — QNX/VxWorks/RTEMS,
-not something glibc or upstream musl implement either). Doesn't move the Linux/glibc comparison
-number at all (real Linux distros are `UNSUPPORTED` here too) but would be a genuine feature this
-kernel doesn't have. Real implementation needs an extended `struct sched_param` (musl header
-patch), a per-thread budget/priority state machine, and timer-driven replenishment — a new
-scheduling primitive, not a quick fix. Not yet slotted into a specific release.
+### 3.5. v0.6.0: self-hosted `rustc`/`cargo`
+
+Phase 3 from the Rust side: `rustc`, `cargo`, a linker and an assembler running as OxideBSD
+processes, able to rebuild OxideBSD's kernel and userland on target. Builds on v0.3.0's `std`
+target.
+
+### 3.6. v0.7.0: oxlibc
+
+OxideBSD's own from-scratch libc, BSD-3-Clause, alongside the musl and glibc ports rather than
+replacing them. Not a fork of `relibc` or anything else under other terms. Partly pulled into
+v0.4.0 (2026-09-23).
+
+### 3.7. v0.8.0: graphics
+
+Grows existing groundwork into a desktop: `/dev/fb0` (`process::mm::do_mmap_fb` maps the
+framebuffer into a process) and the raw keyboard-event source (`SYS_GET_KEYEVENT`,
+`console::keyevents`), both proven by the Doom port (`external/gpl2/doomgeneric`). Scope: mouse
+support (no mouse driver exists, PS/2 or USB), a windowing and compositing model, display-mode
+negotiation beyond the boot-time GOP/VBE mode.
+
+### 3.8. v0.9.0: hardware support
+
+Broader real hardware support, porting drivers from Linux and BSD sources with per-driver license
+review (GPL and the BSD licenses are not interchangeable with this project's). It is the readiness
+gate for running OxideBSD on the owner's Surface Pro as a daily driver: USB keyboard input is done
+(the Surface has no PS/2); WiFi/networking and graphics acceleration remain.
+
+### 3.9. v0.10.0: package manager
+
+A package manager. Today every program is built into the image by `build.rs`; nothing is
+independently installable. Not designed.
+
+### 3.10. v0.11.0: v1.0.0 preparation
+
+A stabilization and hardening pass before 1.0. Scope not defined.
+
+## 4. Unscheduled ideas
+
+Not assigned to a release.
+
+- **uutils.** Replacing some BusyBox utilities with Rust `uutils` was raised and set aside; it is
+  not a dependency of the GCC/Clang work.
+- **Full `vim`.** `nano` and nvi (OpenVi) are ported; full (non-BusyBox) `vim` is not.
+- **`SCHED_SPORADIC`** (POSIX Sporadic Server). Would turn the 13 `_POSIX_SPORADIC_SERVER`-gated
+  `sched_setscheduler`/`sched_setparam` conformance files from UNSUPPORTED into tests. Needs an
+  extended `struct sched_param` (musl header patch), a per-thread budget and priority state
+  machine, and timer-driven replenishment. glibc and upstream musl don't implement it either.

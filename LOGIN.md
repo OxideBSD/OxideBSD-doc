@@ -1,6 +1,10 @@
 # OxideBSD getty, login and PAM: design specification
 
-Status: **accepted design, partly implemented** (not yet: the serial-terminal tests of §9.2, which need `tty01`; init's boot and shutdown records, §8.2; `who`). Target release: v0.3.0.
+Status: **partly implemented**: all but `who` and the serial-terminal tests (2026-10-01; 093ec0e, 6899d9d).
+Target release: v0.3.0.
+
+Not yet: the serial-terminal tests of §9.2, which need `tty01`, and `who`. init's `BOOT_TIME` and
+`SHUTDOWN_TIME` records (§8.2) landed in 6899d9d.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `getty(8)`, `gettytab(5)`, `login(1)`,
@@ -24,7 +28,7 @@ user's login class, records the session, and starts the user's shell.
 | `/usr/bin/login` | Authentication and session start | Rust, `usr.bin/login` |
 | `/etc/login.conf` | Login classes (`login.conf(5)`) | `etc/login.conf` |
 | `/etc/pam.d/` | PAM policies: `system`, `login`, `other` | `etc/pam.d/` |
-| `/usr/lib/libpam.a` | OpenPAM, static, with OxideBSD's modules | `external/bsd/openpam` + `lib/libpam/modules` |
+| `/usr/lib/libpam.a` | OpenPAM, static, with OxideBSD's modules | `external/bsd/openpam` + `lib/libpam/src/modules` |
 | `/etc/motd` | Message of the day | `etc/motd` |
 | `/etc/master.passwd`, `/etc/passwd`, `/usr/sbin/pwd_mkdb` | Accounts (`passwd(5)`, `pwd_mkdb(8)`) | `etc/master.passwd`, Rust `usr.sbin/pwd_mkdb` |
 | `/var/run/utmpx`, `/var/log/wtmpx`, `/var/log/lastlogx` | Session records (`utmpx(3)`) | musl |
@@ -103,7 +107,7 @@ static-module lookup (`openpam_static.c`) is changed to walk a NULL-terminated t
 `openpam_static_modules[]`, that the modules library defines, in place of the GNU linker sets
 upstream uses. The change is local to the vendored tree and SHOULD be offered upstream.
 
-6.3. The modules are written in Rust (`lib/libpam/modules`), exporting OpenPAM's `struct
+6.3. The modules are written in Rust (`lib/libpam/src/modules`), exporting OpenPAM's `struct
 pam_module` for each:
 
 | Module | Functions | Behavior |
@@ -169,5 +173,5 @@ logout removes it.
 ## 10. Open questions
 
 1. Whether `login-timeout` should be proposed upstream, or stay OxideBSD's.
-2. Account tools: `vipw`, `chpass`, `passwd` and `pw`/`adduser` replacing BusyBox's, which edit
-   `/etc/shadow`.
+2. Account tools: `vipw`, `chpass` and `pw`/`adduser`. `passwd` is OxideBSD's own
+   (`usr.bin/passwd`); `/etc/shadow` no longer exists (§7.4).

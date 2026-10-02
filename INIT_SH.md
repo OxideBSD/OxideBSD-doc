@@ -1,7 +1,12 @@
 # OxideBSD init_sh: design specification
 
-Status: **accepted (reviewed 2026-09-23).** Items marked *(proposal)* were accepted as written. Target release:
-v0.3.0. Companion to `INIT.md`.
+Status: **partly implemented** (2026-10-01). Target release: v0.3.0. Companion to `INIT.md`.
+
+The design was accepted on 2026-09-23; items marked *(proposal)* were accepted as written.
+Implemented: the POSIX core (§3; 1274450, ca6effa), `rc.conf` handling (§4.6) and the `rc.subr`
+built-ins (§4.7; b212178), mixed ordering in `rcorder` (§6), and the differential tests (§8). Not
+implemented: running service blocks (§4.1–4.3 parse only), `/sbin/initconf` (§4.4), `daemon -r`
+restarts (§4.5.2) and the init and kernel built-ins (§4.8).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -20,7 +25,7 @@ binaries:
 | Binary | Language | Status |
 |---|---|---|
 | `/sbin/init_sh` | POSIX sh + init dialect | this specification |
-| `/bin/sh` | POSIX sh + interactive features | future; replaces BusyBox `hush` |
+| `/bin/sh` | POSIX sh + interactive features | implemented (ca6effa, badfa65) |
 
 2.2. The init dialect MUST NOT be present in `/bin/sh`. A script that uses the dialect is an
 `init_sh` program and MUST begin with `#!/sbin/init_sh`.
@@ -113,6 +118,8 @@ A non-zero exit from `start_pre` MUST abort the start.
 
 ### 4.4. Actions and initconf
 
+*Not implemented.*
+
 4.4.1. Services are controlled and configured with `/sbin/initconf`, a separate program:
 
 ```
@@ -163,7 +170,8 @@ ignored.
 
 ### 4.7. rc.subr built-ins
 
-*Implemented (b212178).* Service blocks parse (§4.1–4.3) but cannot run yet.
+*Implemented (b212178).* Service blocks parse (§4.1–4.3) but cannot run yet: `init_sh` reports
+"service blocks cannot run yet" and exits 2.
 
 These are native built-ins, so that scripts written for FreeBSD's `rc.subr` run unchanged:
 `load_rc_config`, `run_rc_command`, `checkyesno`, `check_pidfile`, `check_process`,
@@ -171,6 +179,8 @@ These are native built-ins, so that scripts written for FreeBSD's `rc.subr` run 
 accepted and has no effect.
 
 ### 4.8. Init and kernel built-ins *(proposal)*
+
+*Not implemented.*
 
 | Built-in | Purpose |
 |---|---|

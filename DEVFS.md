@@ -1,23 +1,20 @@
 # OxideBSD device filesystem: design specification
 
-Status: **accepted design, implemented** (2026-09-30). Target release: v0.3.0.
+Status: **implemented** (2026-09-30, `342fda3`). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `devfs(4)` and `devfs.conf(5)`; this
 document records the design. It follows FreeBSD, whose `devfs` it is modelled on; NetBSD and
-OpenBSD still create static nodes with `MAKEDEV`, which is what OxideBSD had and what failed
-(below).
+OpenBSD create static nodes with `MAKEDEV`.
 
 ## 1. Scope
 
 The kernel's registry of devices, the file system that presents them at `/dev`, and how `/dev`
 is customized at boot.
 
-**Rationale.** Until now every node in `/dev` but four was an ordinary oxfs inode created once,
-when the disk was formatted. A mount never created them again, so `rm /dev/fb0` removed the
-framebuffer for good, surviving every reboot (issue #1). The four exceptions (`null`, `zero`,
-`random`, `urandom`) were intercepted by name before path lookup. Device handling was split
-between oxfs (those four and `fb0`) and the kernel (terminals, `klog`), by device number.
+**Rationale.** Static nodes on a persistent disk can be lost for good (`rm /dev/fb0` survived
+every reboot, issue #1), and they split device handling between oxfs and the kernel. A registry
+the kernel owns, presented afresh at every boot, keeps `/dev` matching the devices present.
 
 ## 2. Components
 
@@ -45,9 +42,8 @@ reads to keep `/dev` current (§4.3).
 
 3.4. Opening a device node, anywhere, goes through the registry by number: `oxidebsd_dev_open(
 major, minor, flags)` calls the entry's open function, or fails with `ENXIO` if none is
-registered. oxfs's own table of known devices, and the interception of the four names, are
-removed; oxfs registers the devices it implements (`null`, `zero`, `random`, `urandom`, `fb0`)
-like any other driver.
+registered. oxfs intercepts no device names; it registers the devices it implements (`null`,
+`zero`, `random`, `urandom`, `fb0`) like any other driver.
 
 3.5. Device numbers are kept as they are (Linux's where one exists): `null` (1, 3), `zero`
 (1, 5), `random` (1, 8), `urandom` (1, 9), `ttyv<n>` (4, n), `tty` (5, 0), `console` (5, 1),

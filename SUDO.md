@@ -1,6 +1,7 @@
-# OxideBSD privilege escalation: sudo-rs — design specification
+# OxideBSD privilege escalation (sudo-rs): design specification
 
-Status: **accepted plan, not yet implemented.** Target release: v0.3.0.
+Status: **accepted**, not implemented (2026-10-01; some prerequisites done, see §8). Target
+release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -9,8 +10,8 @@ RFC 2119.
 
 This document specifies how `sudo` and `su` come to OxideBSD: the port of sudo-rs, and the kernel,
 device and library work it depends on. Most of that work is not sudo-specific. It is part of the
-v0.3.0 cleanup (`CLEANUP.md`): OxideBSD today has one uid per process, no setuid, no `/dev/tty`
-and no pseudo-terminals, and a regular OS has all four.
+v0.3.0 cleanup (`CLEANUP.md`): OxideBSD today has one uid per process, no set-user-ID execution and no
+pseudo-terminals, and a regular OS has all three.
 
 ## 2. Decisions
 
@@ -102,11 +103,14 @@ are specified separately (`PTY.md`, to be written).
 
 ### 5.4. OpenPAM
 
-5.4.1. OpenPAM is vendored under `external/bsd/openpam` and built as a static `libpam.a` with its
-modules linked in, since OxideBSD has no `dlopen`. That OpenPAM supports static modules needs
-confirming against its current release before work starts.
+*Done (093ec0e; `LOGIN.md` §6).*
 
-5.4.2. `pam_unix` MUST authenticate against `/etc/shadow` with `crypt(3)` (musl's).
+5.4.1. OpenPAM is vendored under `external/bsd/openpam` and built as a static `libpam.a` with its
+modules linked in. Static modules work through a local change to `openpam_static.c`
+(`LOGIN.md` §6.2).
+
+5.4.2. `pam_unix` MUST authenticate against `/etc/master.passwd` with `crypt(3)` (musl's;
+`LOGIN.md` §7.4).
 
 ## 6. The sudo-rs port
 
@@ -131,16 +135,20 @@ functions the port needs.
 
 ## 8. Order of work
 
-1. Kernel credentials (§5.1).
+1. Kernel credentials (§5.1). Not started: a process has one `uid` and `gid`; `AT_SECURE` is
+   always passed as 0; oxfs keeps the set-user-ID, set-group-ID and sticky bits
+   through `chmod` (342fda3).
 2. `/dev/tty`, `/dev/console`, `ttyname` (§5.2.1–5.2.2); `/proc` start time and syscall 318 (§5.3).
-3. Pseudo-terminals (§5.2.3), after `PTY.md` is written and accepted.
-4. OpenPAM (§5.4). Independent of 3.
-5. The sudo-rs port and seeding (§6), then §7.
+   `/dev/tty` and `/dev/console` are devfs nodes (342fda3, `sys/tty/console.rs`). `/proc/<pid>/stat`
+   field 22 is still 0.
+3. Pseudo-terminals (§5.2.3), after `PTY.md` is written and accepted. Not started.
+4. OpenPAM (§5.4). Independent of 3. Done (093ec0e).
+5. The sudo-rs port and seeding (§6), then §7. Not started; `/etc/group` has no `wheel` yet.
 
 ## 9. Open questions
 
 1. Pseudo-terminal naming (`/dev/ptmx` + `/dev/pts/N`, which FreeBSD also uses today, or
    BSD-style `/dev/ptyXX`) and how complete the line discipline must be. For `PTY.md`.
-2. Whether OpenPAM's static-module build works as expected (§5.4.1).
-3. Where sudo's syslog messages go: OxideBSD has no `/dev/log` yet (that needs named `AF_UNIX`
-   datagram sockets, also an init-system prerequisite, `INIT.md`). Until then they are dropped.
+2. ~~Whether OpenPAM's static-module build works as expected (§5.4.1).~~ Resolved: it does
+   (093ec0e).
+3. ~~Where sudo's syslog messages go.~~ Resolved: `syslogd` reads `/dev/log` (`SYSLOG.md`, 9056be8).

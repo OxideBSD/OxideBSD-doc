@@ -1,6 +1,6 @@
 # OxideBSD cron and periodic: design specification
 
-Status: **accepted design, implemented** (2026-09-30; see §11). Target release: v0.3.0.
+Status: **implemented** (2026-09-30, bb68898; see §11). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `cron(8)`, `crontab(1)`, `crontab(5)`,

@@ -1,85 +1,79 @@
-# OxideBSD cleanup: shortcuts to remove
+# OxideBSD shortcuts: cleanup inventory
 
-Status: **working inventory**, started 2026-09-24. Target release: v0.3.0 for items marked so.
+Status: **working inventory** (started 2026-09-24, verified against `946dfa0` on 2026-10-01).
+Target release: v0.3.0 for items marked so.
 
-OxideBSD grew fast by taking shortcuts: behaviour that is good enough for the next milestone but
-not what a regular Unix system does. v0.3.0 is also a cleanup release, whose goal is that OxideBSD
-*acts like a regular OS*. This document lists every known shortcut, what a regular system does
-instead, and where it is planned. It is sourced from the "known gap" notes in the main repository's
-`CLAUDE.md` and from what recent work uncovered; add to it whenever a new shortcut is found.
+## 1. Scope
 
-**Target** is `v0.3.0`, a later release named in `ROADMAP.md`, or `later` (unscheduled). An item is
-removed from this list when its fix lands, with the commit noted in the history section.
+This inventory lists every known shortcut: behaviour good enough for an earlier milestone but not
+what a regular Unix system does. v0.3.0 is also a cleanup release whose goal is that OxideBSD acts
+like a regular OS (`ROADMAP.md` §3.2). Add a row whenever a new shortcut is found.
 
-## 1. Security
+**Target** is `v0.3.0`, a later release named in `ROADMAP.md`, or `later` (unscheduled). When a
+fix lands, the row moves to §8 with its commit.
+
+## 2. Security
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| One uid and one gid per process; no real/effective/saved split; supplementary groups not stored (`getgroups` returns the caller's gid); setuid/setgid bits ignored at `execve`. | POSIX credentials; setuid executables | v0.3.0 (`SUDO.md` §5.1) |
+| One uid and one gid per process; no real/effective/saved split (`setresuid` stores a single value); supplementary groups not stored (`getgroups` returns the caller's gid); setuid/setgid bits ignored at `execve`. | POSIX credentials; setuid executables | v0.3.0 (`SUDO.md` §5.1) |
 | Syscalls dereference user pointers without validating them (`sys_read`/`sys_write` and others); a bad pointer faults instead of returning `EFAULT`. | `copyin`/`copyout` with `EFAULT` | v0.3.0 |
 | No `NO_EXECUTE` on any page, no W^X; module pages all writable; ELF segments sharing a page don't union their flags. | NX stacks and data, read-only text | later |
 
-## 2. Processes and signals
+## 3. Processes and signals
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| pid 1 is a shell (`/bin/sh`, before that hush); no init, no `/etc/rc`, no getty/login at boot. | `/sbin/init` | v0.3.0 (`INIT.md`) |
-| An orphan reparented to pid 1 is detached immediately (pid 1 has no reaping loop). | init reaps orphans | v0.3.0 (with init) |
-| `setrlimit` limits are stored, never enforced. | Enforced | v0.3.0 (the ones that matter: `NOFILE`, `STACK`, `AS`, `CORE`) |
+| An orphan reparented to pid 1 is reaped by the kernel at exit (`Process::adopted`, treated like `SA_NOCLDWAIT`), although `/sbin/init` now reaps with `waitpid(-1, WNOHANG)`. | init reaps orphans | v0.3.0 |
+| `setrlimit` limits are stored, never enforced (only `RLIMIT_MEMLOCK`, for `mlockall(MCL_FUTURE)`). | Enforced | v0.3.0 (the ones that matter: `NOFILE`, `STACK`, `AS`, `CORE`) |
 | `nice`/`setpriority` stored, no effect on scheduling. | Affects scheduling | later |
-| `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` system time stale. | Real user/system split | later |
+| `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` returns an all-zero `struct rusage`. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 | Fork copies the whole address space eagerly. | Copy-on-write | later |
 
-## 3. Files and descriptors
+## 4. Files and descriptors
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| oxfs's open-file table is system-wide and fixed-size. | Per-process tables with `RLIMIT_NOFILE` | v0.3.0 |
-| `unlink`/`rmdir` never free blocks or inodes; tmpfs space is never reclaimed. | Freed on last link and last close | v0.3.0 |
+| oxfs's open-file table is system-wide and fixed-size (`MAX_OPEN_FILES = 2048`). | Per-process tables with `RLIMIT_NOFILE` | v0.3.0 |
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
-| `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing. | `EXDEV` across filesystems | v0.3.0 |
-| Only four device nodes do anything (`/dev/random`, `urandom`, `null`, `zero`). No `/dev/tty`, `/dev/console`, ptys. | Real character devices | v0.3.0 (`SUDO.md` §5.2) |
+| `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing (`link` already fails `EXDEV`). | `EXDEV` across filesystems | v0.3.0 |
 | `/proc` is a special case inside oxfs; no VFS layer. | A VFS with filesystems mounted on it | later |
-| The whole disk is loaded into RAM at mount; the block pool is a fixed ~1 GiB; `NUM_BLOCKS`/`MAX_INODES` are compile-time constants. | Block cache over the disk; size from the disk | later |
+| Every used block of the disk is loaded into RAM at mount; the block pool is a fixed 1 GiB; `NUM_BLOCKS` is a compile-time constant. | Block cache over the disk; size from the disk | later |
 | A mounted disk never picks up a newer build's files; only a reformat does. | An installer and upgrades | later (v0.10.0, packages) |
-| ATA is PIO and polled, with interrupts masked. | DMA, interrupt-driven | later (v0.9.0, hardware) |
 
-## 4. Terminals
+## 5. Terminals
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| The console's descriptors are one-way: fd 0 cannot be written, 1 and 2 cannot be read. | A tty opened read-write | v0.3.0 |
-| No line discipline: `ICANON` is recorded, not acted on; every program does its own erase and echo; Ctrl+D is a plain byte to a program that didn't implement EOF itself. | Canonical mode in the kernel | v0.3.0 |
-| One global termios and one controlling session, because there is one console. | Per-terminal state | v0.3.0 (with ptys) |
-| No pseudo-terminals. | ptys | v0.3.0 (`SUDO.md` §5.2.3) |
+| No pseudo-terminals (no `/dev/ptmx`, `posix_openpt`). | ptys | v0.3.0 (`SUDO.md` §5.2.3) |
 
-## 5. Networking
+## 6. Networking
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | The guest's IP address and gateway are compiled in; no `ifconfig`, no DHCP client. | Configured at boot (`rc.conf`) | v0.3.0 (`INIT.md`: `ifconfig_*`) |
-| A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces configured at build time. | A routing table and `ifconfig`/`route` | later |
-| Incoming packets are only processed when a process calls into the network stack (the NIC is polled, not interrupt-driven), so `poll`/`select` on a socket must keep running instead of blocking, and can't also see keystrokes in the same call. | Interrupt-driven receive | v0.3.0 |
+| A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces (`lo0`, `rl0`) configured at build time. | A routing table and `ifconfig`/`route` | later |
+| Incoming packets are processed only by processes waiting in the network stack: the rtl8139 interrupt only sets a flag and wakes waiters, and a wait involving a socket wakes every 50 ms to drive the NIC. | Interrupt-driven receive | v0.3.0 |
 | TCP is stop-and-wait with a fixed 536-byte segment size, no window or congestion control. | Real TCP | later |
 | No IPv6. | IPv6 | later |
 
-## 6. Userland and build
+## 7. Userland and build
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | Every file on the system is embedded in the kernel's oxfs module at build time and seeded on format. | A root filesystem image built separately and installed | later (installer) |
-| BusyBox applets are 195 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
+| BusyBox applets are 128 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
 | `mprotect` enforcement limited to the `mmap` window. | Everywhere | later |
 | A PIE's `brk` heap starts at its unbiased end address, low in memory, not after the randomized image; musl's allocator falls back to `mmap` when growing it fails. | The heap follows the image | later |
 | After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
 | The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
-| `/etc/passwd` and `/etc/group` can't be changed by any tool (`adduser`, `passwd`...). | They can | v0.3.0 |
+| Only `passwd(1)` changes `/etc/master.passwd` and `/etc/passwd` (through `pam_unix`); no tool adds or removes users or groups (`adduser`, `pw`, `vipw`). | They can | v0.3.0 |
 
-## 7. History
+## 8. History
 
-Record removed shortcuts here as `date — item — commit`.
+Removed shortcuts, as `date — item — commit`.
 
 - 2026-09-24 — `AT_RANDOM` is 16 fresh random bytes per `execve` — f97971a (branch `cleanup-easy-shortcuts`)
 - 2026-09-24 — `reboot(2)` is root-only — f97971a
@@ -95,8 +89,16 @@ Record removed shortcuts here as `date — item — commit`.
 - 2026-09-25 — kernel stacks have guard pages (`memory::kstack`) — 124974b
 - 2026-09-25 — a write that fails `EPIPE` raises `SIGPIPE` — a10bb36
 - 2026-09-25 — a process killed while blocked in a FIFO `open()` gives back its reader/writer count — a10bb36
+- 2026-09-26 — terminals: a per-device tty layer with its own termios, window size, session and foreground group; the POSIX line discipline (canonical mode, echo, `ISIG`, `VMIN`/`VTIME`) in the kernel; fds 0-2 of the console are one read-write description — 8deb5e2
+- 2026-09-26 — `/dev/ttyv0`, `/dev/tty` (the controlling terminal) and `/dev/console` — fde98f6
+- 2026-09-26 — disk I/O by DMA (virtio-blk, IDE bus-master), interrupt-driven completion with a polling fallback — 2992d55
+- 2026-09-27 — getty, login and `passwd(1)` in the image (OpenPAM, utmpx, `master.passwd`) — 093ec0e
+- 2026-09-28 — socket waits block with interrupts enabled instead of spinning; an rtl8139 interrupt wakes them — a73d4a3
+- 2026-09-29 — `unlink`/`rmdir`/`rename` over a name/last close free an inode and its blocks once nothing refers to it, in the disk and tmpfs pools; inode tables grow and shrink instead of a fixed `MAX_INODES` — 13113f8, 475e995
+- 2026-09-29 — devfs: a kernel device registry (`make_dev`), `/dev` rebuilt every boot — 342fda3
 - 2026-09-30 — dynamically linked programs: every `ET_DYN` executable gets an ASLR bias, `PT_INTERP` or not (`execve`, the kernel's `spawn`); one musl build makes `libc.a` and `libc.so` — f9fb253, e40cc9f, a9b8d5b
 - 2026-09-30 — a file `mmap` at a nonzero offset (it was `EINVAL`), so `ld.so` loads shared libraries and `dlopen` works — 026e9ba
-- 2026-09-30 — Rust `std` programs are PIEs, dynamically linked on `/lib/libc.so` and `/lib/libgcc_s.so.1` (pid 1 static) — ab98faf
+- 2026-09-30 — Rust `std` programs are PIEs, dynamically linked on `/lib/libc.so` and `/lib/libgcc_s.so.1` (`/bin` and `/sbin` static) — ab98faf, 33a69e6
 - 2026-09-30 — a loopback interface, `lo0`, and sockets with real local addresses; `/etc/hosts` — c22d920
 - 2026-09-30 — TCP no longer drops data still buffered at `close()`/`shutdown(SHUT_WR)` — c22d920
+- 2026-10-01 — pid 1 is `/sbin/init` (`INIT.md`): `/etc/rc`, `/etc/ttys` sessions with getty, signals, syslog, utmpx boot/shutdown records, recovery, `init=`/`init_path=` — 52656de, 3e3241e, 6899d9d, 3295c7c, 946dfa0

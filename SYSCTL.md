@@ -1,6 +1,7 @@
 # OxideBSD sysctl: design specification
 
-Status: **accepted design, implemented** (not yet: the optional module interface of §3.6). Target release: v0.3.0.
+Status: **implemented** (2026-10-01; not yet: the optional module interface of
+§3.6). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interfaces are documented in the manual pages `sysctl(3)`, `sysctl(8)` and
@@ -27,7 +28,7 @@ the load average and memory statistics the `vm` variables report.
 | `/etc/sysctl.conf`, `/etc/sysctl.conf.local` | Settings applied at boot | `etc/sysctl.conf` |
 | `/etc/rc.d/sysctl` | Applies them | `etc/rc.d` |
 
-BusyBox's `sysctl` stops being installed; it reads Linux's `/proc/sys`, which OxideBSD does not
+BusyBox's `sysctl` is not installed; it reads Linux's `/proc/sys`, which OxideBSD does not
 have.
 
 ## 3. The tree
@@ -119,6 +120,8 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `vm.pagecache.misses` | unsigned long | read | pages read into the cache since boot |
 | `vm.pagecache.limit` | unsigned int | read | frames files no process uses may hold |
 | `vm.pagecache.list` | string | read | a line per entry: inode, size, frames held, uses |
+| `debug.syscall.stats` | string | read | calls, wall and CPU time per system call since boot or the last reset |
+| `debug.syscall.reset` | int | read-write | writing a non-zero value zeroes `debug.syscall.stats`; reads 0 |
 | `debug.kill_init` | int | read-write | writing a signal number kills init with it, so that its restart (`INIT.md` §9) can be tested; reads 0 |
 
 5.1. **Architecture names** are FreeBSD's, `hw.machine` naming the port and `hw.machine_arch`
@@ -131,8 +134,8 @@ the processor architecture:
 | 64-bit RISC-V | `riscv` | `riscv64` |
 | 64-bit little-endian POWER | `powerpc` | `powerpc64le` |
 
-`uname(2)`'s `machine` field MUST equal `hw.machine`, so `uname -m` changes from `x86_64` to
-`amd64`; `uname -p` prints `hw.machine_arch`. The
+`uname(2)`'s `machine` field MUST equal `hw.machine`, so `uname -m` prints `amd64`; `uname -p`
+prints `hw.machine_arch`. The
 compiler's target triple (`x86_64-unknown-oxidebsd`) is unaffected; triples and machine names are
 separate namespaces in the BSDs too.
 
@@ -191,7 +194,7 @@ exact rather than estimates.
 `t_dw` in disk wait, `t_pw` in page wait, always 0, `t_sl` sleeping, `t_sw` always 0) and memory
 totals in pages (`t_free` and the virtual and real totals).
 
-10.3. `sysinfo(2)`'s `freeram` becomes `v_free_count` pages instead of all memory.
+10.3. `sysinfo(2)`'s `freeram` is `v_free_count` pages.
 
 ## 11. Verification
 

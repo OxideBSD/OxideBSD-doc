@@ -1,62 +1,78 @@
-# OxideBSD program inventory
+# OxideBSD programs: file placement inventory
 
-Where each program in the base system is installed, and the BusyBox applets taken out of it. A
-working list, not a specification: the rules for where things go, and every directory, are in
-`hier(7)` (`share/man/man7/hier.7` in the OxideBSD tree, and on the website's manual pages).
+Status: **current** (2026-10-01, `946dfa0`).
 
-## Where every current binary goes (227 programs)
+## 1. Scope
 
-This is the seeded layout (2026-09-23). The source tree mirrors it, except for the BusyBox
-applets, which all build from `external/gpl2/busybox`. Added since, among others: `/usr/bin/openssl`
-and `/usr/sbin/certctl` (2026-09-30).
+Every program oxfs seeds into the base system (`sys/modules/oxfs/src/lib.rs`, `seed_file`,
+`seed_symlink`, `seed_hardlink` and the generated `seed_tree` lists), by directory and by where
+its source lives. The placement rules and every directory are in `hier(7)`
+(`share/man/man7/hier.7`). Programs in `/bin` and `/sbin` are static PIE. Elsewhere, OxideBSD's
+own programs are dynamic PIEs on `/lib/libc.so`; ports linked at a fixed address (BusyBox, bmake
+and others) are static.
 
-### `/bin` (44)
-`ash`, `cat`, `chmod`, `cp`, `date`, `dd`, `df`, `echo`, `ed`, `egrep`, `expr`, `false`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `hush`, `kill`, `link`, `ln`, `ls`, `mkdir`, `mv`, `nproc`, `pgrep`, `pkill`, `pwd`, `realpath`, `rm`, `rmdir`, `sed`, `sh`, `sleep`, `stty`, `sync`, `tar`, `test`, `timeout`, `touch`, `true`, `unlink`, `vi`, `zcat`
+Source locations: native programs live at the same path in the tree (`bin/`, `sbin/`, `usr.bin/`,
+`usr.sbin/`, `libexec/`); BusyBox applets build from `external/gpl2/busybox`
+(`BUSYBOX_APPLETS.md`). Links are marked `->` (symbolic) or `=` (hard).
 
-`sh` is OxideBSD's own shell (`lib/libsh`); `hush` is BusyBox's, still pid 1 and the interactive
-shell until `sh` has an interactive mode. `touch` is here (not `/usr/bin` as on FreeBSD) because
-it's one of the native `bin/` utilities.
+## 2. `/bin` (44 entries)
 
-### `/sbin` (12)
-`dmesg`, `halt`, `init_sh`, `lsmod`, `lsoxmod`, `mknod`, `mount`, `ping`, `poweroff`, `sulogin`, `sysctl`, `umount`
+| Source | Programs |
+|--------|----------|
+| Native (`bin/`, 23) | `cat`, `chmod`, `cp`, `echo`, `false`, `kill`, `link`, `ln`, `ls`, `mkdir`, `mv`, `nproc`, `pwd`, `rm`, `rmdir`, `sh`, `sleep`, `sync`, `test`, `touch`, `true`, `unlink`, `vi` |
+| Links (1) | `[` = `test` |
+| BusyBox (20) | `ash`, `date`, `dd`, `df`, `ed`, `egrep`, `expr`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `pgrep`, `pkill`, `realpath`, `sed`, `stty`, `tar`, `timeout`, `zcat` |
 
-Missing and needed here: `reboot`, `init`, `rcorder`, `shutdown`, `ifconfig`/`route` (OxideBSD's
-own, once the kernel has interface-configuration ioctls), `fsck` (when oxfs gets one).
+`sh` is OxideBSD's own shell (`lib/libsh`). `vi` is OpenVi (`bin/vi`). `ash` remains for autoconf
+`configure` scripts and as `/sbin/emergency`'s fallback shell.
 
-### `/usr/bin` (146)
-`ar`, `arch`, `ascii`, `awk`, `base32`, `base64`, `basename`, `bc`, `bmake`, `bunzip2`, `bzcat`, `bzip2`, `cal`, `chat`, `chgrp`, `chown`, `cksum`, `clang`, `clang++`, `clear`, `cmp`, `comm`, `cpio`, `crc32`, `crontab`, `cryptpw`, `cut`, `dc`, `diff`, `dirname`, `dnsdomainname`, `dos2unix`, `du`, `env`, `expand`, `factor`, `fallocate`, `find`, `flock`, `fold`, `free`, `fsync`, `ftpget`, `ftpput`, `fuser`, `getopt`, `groups`, `head`, `hexdump`, `hexedit`, `hostid`, `install`, `ipcalc`, `ld.lld`, `less`, `login`, `logname`, `lsof`, `lzcat`, `lzop`, `make`, `man`, `md5sum`, `minips`, `mkpasswd`, `mktemp`, `more`, `mountpoint`, `nano`, `nc`, `netcat`, `netstat`, `nice`, `ninja`, `nl`, `nohup`, `nslookup`, `od`, `passwd`, `paste`, `patch`, `pidof`, `pipe_progress`, `printenv`, `printf`, `pscan`, `pstree`, `pwdx`, `readlink`, `renice`, `reset`, `resize`, `rev`, `run-parts`, `seq`, `setsid`, `sha1sum`, `sha256sum`, `sha3sum`, `sha512sum`, `shred`, `shuf`, `sort`, `split`, `ssl_client`, `stat`, `strings`, `su`, `sum`, `tac`, `tail`, `tee`, `telnet`, `time`, `top`, `tr`, `traceroute`, `tree`, `truncate`, `ts`, `tsort`, `tty`, `ttysize`, `uname`, `uncompress`, `unexpand`, `uniq`, `unix2dos`, `unlzma`, `unxz`, `unzip`, `uptime`, `usleep`, `uudecode`, `uuencode`, `volname`, `watch`, `wc`, `wget`, `which`, `whoami`, `whois`, `xargs`, `xxd`, `xzcat`, `yes`
+## 3. `/sbin` (18 entries)
 
-Clang's resource directory moved with it: `/usr/lib/clang/23`.
+| Source | Programs |
+|--------|----------|
+| Native (`sbin/`, 12) | `dmesg`, `emergency`, `init`, `init_sh`, `lsoxmod`, `mount`, `nologin`, `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount` |
+| Links (4) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `lsmod` -> `lsoxmod` |
+| BusyBox (2) | `mknod`, `ping` |
 
-### `/usr/sbin` (16)
-`addgroup`, `adduser`, `chpasswd`, `chroot`, `chrt`, `crond`, `cttyhack`, `delgroup`, `envuidgid`, `killall5`, `makedevs`, `ntpd`, `remove-shell`, `setuidgid`, `softlimit`, `start-stop-daemon`
+`init_sh` is the non-interactive interpreter for `/etc/rc` and `/etc/rc.d/*` (`INIT_SH.md`).
 
-### `/usr/libexec` (1), `/usr/games` (1)
-`getty`; `doom`
+Not yet present, and expected here: `ifconfig` and `route` (need interface-configuration ioctls),
+`fsck` and `newfs` for oxfs.
 
-### `/usr/tests` (7)
-`float-smoke`, `musl`, `smoke`, `std-hello`, `std-hello-oxidebsd`, `std-process-fs-oxidebsd`, `std-thread-net-signal-oxidebsd` -- regression fixtures.
+## 4. `/usr/bin` (123 entries)
 
-## Removed 2026-09-30
+| Source | Programs |
+|--------|----------|
+| Native (`usr.bin/`, 8) | `apropos`, `crontab`, `logger`, `login`, `man`, `more`, `oxdoc`, `passwd` |
+| Forks and vendored ports (7) | `bmake` (`usr.bin/make`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`) |
+| Links (4) | `whatis` -> `apropos`, `less` -> `more`, `make` -> `/usr/bin/bmake`, `clang++` -> `clang` |
+| BusyBox (104) | listed in `BUSYBOX_APPLETS.md` §2 |
 
-45 more BusyBox applets, listed with the reasons in `BUSYBOX_APPLETS.md` ("Third cut"),
-including `/bin/hush`, `/usr/sbin/crond` and BusyBox's `/usr/bin/crontab` (now native).
-`/sbin` gained `init`, `nologin`, `reboot` (+ `halt`, `poweroff`), `rcorder`, `shutdown` and
-`emergency` since the list below was made; `/usr/sbin` gained `cron`, `periodic` and `syslogd`.
+Clang's resource directory is `/usr/lib/clang/23`.
 
-## Removed 2026-09-23
+## 5. `/usr/sbin` (11 entries)
 
-48 BusyBox applets that don't belong in a BSD base system or can't work on this kernel:
+| Source | Programs |
+|--------|----------|
+| Native (`usr.sbin/`, 8) | `certctl`, `cron`, `makewhatis`, `newsyslog`, `periodic` (a shell script), `pwd_mkdb`, `syslogd`, `tzsetup` |
+| Vendored (1) | `zic` (`external/public-domain/tz`) |
+| BusyBox (2) | `chroot`, `ntpd` |
 
-- Foreign or decorative: `dpkg`, `dpkg-deb`, `rpm`, `rpm2cpio`, `bash`/`bash_ash` (aliases for
-  hush/ash), `bbconfig`, `nuke`, `unit-test`, `bootchartd`.
-- Mail, print and network daemons, never verified here: `sendmail`, `popmaildir`, `makemime`,
-  `reformime`, `lpd`, `lpq`, `lpr`, `fakeidentd`, `ftpd`, `telnetd`, `httpd`, `inetd`, `tcpsvd`,
-  `udpsvd`, `dnsd`, `dhcprelay`, `udhcpd`, `dumpleases`, `rdate`.
-- Linux hardware and `/proc` tools: `lspci`, `lsusb`, `lsscsi`, `powertop`, `smemcap`, `nmeter`,
-  `mpstat`, `iostat`, `pmap`, `taskset`, `adjtimex`, `hwclock`, `rtcwake`, `vconfig`.
-- Linux network configuration (Linux `SIOC*` ioctls): `ifconfig`, `ifdown`, `route`, `arp`,
-  `arping`.
+## 6. Other directories
 
-The naming bugs listed here before (`run`, `start`, `remove`, `unit`, `dpkg_deb`) are fixed or
-gone: the build now names applets `run-parts`, `start-stop-daemon` and `remove-shell`.
+| Directory | Programs |
+|-----------|----------|
+| `/usr/libexec` | `getty` (`libexec/getty`) |
+| `/usr/games` | `doom` (`external/gpl2/doomgeneric`) |
+| `/lib` | `libc.so`, `ld-musl-x86_64.so.1` -> `libc.so`, `libgcc_s.so.1` |
+| `/usr/lib` | `libc.so` and `libgcc_s.so` (links into `/lib`) |
+| `/usr/tests` | `float-smoke`, `musl`, `smoke`, `std-hello`, `std-hello-oxidebsd`, `std-process-fs-oxidebsd`, `std-thread-net-signal-oxidebsd` |
+| `/usr/tests/*` | `bin/run.sh`, `cron/run.sh`, `devfs/run.sh`, `init/init-smoke`, `net/run.sh`, `net/loopback-smoke`, `openssl/run.sh`, `openssl/openssl-smoke`, `openssl/openssl-rs-smoke`, `rc/run.sh`, `syslog/run.sh`, `tz/run.sh`, `tz/tz-smoke` |
+
+`/usr/tests` holds regression fixtures, not on any `PATH`. Test files still in `/`
+(`/posix-tests`, `/sh-smoke`, `/ninja-demo`) are to move there (`hier(7)` CAVEATS).
+
+## 7. Removed programs
+
+BusyBox applets removed from the base system, with their replacements and reasons:
+`BUSYBOX_APPLETS.md` §3.

@@ -1,6 +1,7 @@
 # OxideBSD init and rc: design specification
 
-Status: **accepted design, partly implemented** (see §11). Target release: v0.3.0.
+Status: **partly implemented**: all but `initconf`, service blocks, `daemon` and `netif` (2026-10-01, 946dfa0;
+see §11). Target release: v0.3.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119. Interface-level documentation lives in the manual pages `init(8)`, `rc(8)`,
@@ -224,33 +225,35 @@ MUST terminate it and continue.
 
 ## 11. Kernel requirements
 
-The design depends on the following kernel behavior, some of which does not exist yet:
+The design depends on the following kernel behavior:
 
 | Requirement | Section | Status |
 |---|---|---|
 | `kill(-1, sig)` signals every process except process 1 and the caller | 10.3 | Done (f97971a) |
 | Boot flags passed to init as arguments | 4.1 | Done (27dbcb1): `-s` on the kernel command line gives `/sbin/init -s` |
-| `init=` and `init_path=` | 4.1.1 | Done: `sys/kern/start_init` |
+| `init=` and `init_path=` | 4.1.1 | Done (946dfa0): `sys/kern/start_init` |
 | Signal protection for process 1 | 9.1 | Done (b212178) |
-| Respawn, reparenting and repeated-failure program | 9.2–9.6 | Done (b212178); `debug.kill_init` (`SYSCTL.md` §5) kills init to test it |
+| Respawn, reparenting and repeated-failure program | 9.2–9.6 | Done (b212178); `debug.kill_init` (`SYSCTL.md` §5, 3295c7c) kills init to test it |
 | `sethostname(2)` (`rc.d/hostname`) | 12 | Done (b212178): `SYS_SETHOSTNAME` = 576 |
-| `/dev/console` | 13 | Not implemented |
-| Interface configuration ioctls | `rc.d/netif` | Not implemented |
-| Named `AF_UNIX` datagram sockets (`/dev/log`) | `rc.d/syslogd` | Specified in `UNIX.md` |
-| Kernel message buffer, `/dev/klog`, `sysctl(3)` | `rc.d/syslogd`, `rc.d/sysctl` | Specified in `SYSLOG.md`, `SYSCTL.md` |
+| `/dev/console` | 13 | Done: a devfs node (`sys/tty/console.rs`) |
+| Interface configuration ioctls | `rc.d/netif` | Not implemented (interfaces are static) |
+| Named `AF_UNIX` datagram sockets (`/dev/log`) | `rc.d/syslogd` | Done (`UNIX.md`); `syslogd` binds `/dev/log` |
+| Kernel message buffer, `/dev/klog`, `sysctl(3)` | `rc.d/syslogd`, `rc.d/sysctl` | Done (`SYSLOG.md`, `SYSCTL.md`; `sys/kern/subr_msgbuf.rs`) |
 
 Implemented in userland: `/sbin/rcorder` (with FreeBSD's `-k`, `-s`, `-p` and `-g`), `/etc/rc`,
 `/etc/rc.shutdown`, the `rc.subr` built-ins (INIT_SH.md §4.7), `reboot`/`halt`/`poweroff`,
-`shutdown`, `/sbin/emergency`, `/sbin/init` (§§3-7, 9.3, 10), getty,
-login. Not yet: `initconf`, running service
-blocks.
+`shutdown`, `/sbin/emergency`, `/sbin/init` (§§3-7, 9.3, 10: 3e3241e, 6899d9d, 3295c7c; it logs
+through `syslog(3)` and writes `BOOT_TIME`/`SHUTDOWN_TIME` utmpx records), getty, login.
+Not yet: `/sbin/initconf`, running service blocks (they parse but `init_sh` refuses to run them),
+`/usr/sbin/daemon` and `<name>_restart` (§8.2), `rc.d/netif`.
 
 ## 12. Initial services
 
 The first release ships these `rc.d` scripts: `hostname`, `tmp` (a `tmpfs` on `/tmp`), `cleanvar`
-(empties `/var/run`), `sysctl` (`SYSCTL.md`), `cron` (`CRON.md`), `netif`, `syslogd` and
-`newsyslog` (`SYSLOG.md`), and the placeholders `FILESYSTEMS`, `NETWORKING`, `SERVERS`, `DAEMON`
-and `LOGIN`. `netif`, `syslogd` and `sysctl` require the kernel features listed in §11.
+(empties `/var/run`), `devfs`, `mountcritlocal` (`/etc/fstab`), `sysctl` (`SYSCTL.md`), `cron`
+(`CRON.md`), `netif`, `syslogd` and `newsyslog` (`SYSLOG.md`), and the placeholders `FILESYSTEMS`,
+`NETWORKING`, `SERVERS`, `DAEMON` and `LOGIN`. All exist except `netif`, which needs the interface
+ioctls of §11.
 
 12.1. `tmpmfs` defaults to `AUTO`, as in FreeBSD: a `tmpfs` is mounted on `/tmp` only if `/tmp` is
 not writable. **Rationale:** the `tmpfs` pool is small (4 MiB), and compilers write their
