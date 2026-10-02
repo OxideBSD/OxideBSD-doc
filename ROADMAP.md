@@ -46,8 +46,11 @@ Released 2026-09-16.
 
 - Scope: close the gap between OxideBSD's Open POSIX Test Suite pilot run (the full corpus, via
   `scripts/run_posix_pilot_supervised.sh`) and a real Unix baseline.
-- Target (set 2026-09-08): >91% raw pass rate and >95% excluding UNTESTED. Measured results:
-  `POSIX_COMPLIANCE_CHECKLIST.md`.
+- Target (set 2026-09-08): >91% raw pass rate and >95% excluding UNTESTED. Closed at the release
+  run's 90.3% / 94.7%, as close as was practical (`POSIX_COMPLIANCE_CHECKLIST.md`).
+- Retired 2026-10-01: a pass-rate target on the Open POSIX Test Suite was the wrong goal. The suite
+  checks a hand-picked set of interface behaviors; it does not measure conformance, so its pass
+  rate is a bug-finding signal, not a conformance number.
 - The comparison target is UNIX and the BSDs (FreeBSD, NetBSD, OpenBSD). Linux/glibc
   (`scripts/run_posix_pilot_host.sh`) is used only because it is the host available; a BSD-host
   run of the same corpus is not yet scheduled.

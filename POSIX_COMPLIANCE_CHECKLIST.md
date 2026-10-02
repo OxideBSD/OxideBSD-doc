@@ -10,6 +10,11 @@ standard describes, measured with an independent test suite. The goal is to do b
 real BSD and Unix systems, not to reach 100% or certification. Linux with glibc is used as the
 available point of comparison.
 
+1.1.1. The Open POSIX Test Suite's pass rate is not a conformance measure (decided 2026-10-01):
+the suite checks a hand-picked set of interface behaviors, leaves many UNTESTED or UNSUPPORTED by
+design, and doesn't cover utilities, headers or most of the standard's requirements. Its results
+find bugs and catch regressions; no release target is set on its pass rate.
+
 1.2. The Open Group's UNIX trademark certification (VSX-PCTS, a paid submission per release) is
 out of scope.
 
