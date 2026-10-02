@@ -44,7 +44,6 @@ number, so the call fails with `ENOSYS` (or, where noted, the interface fails an
 | POSIX interface(s) | Backing system call (number) | musl call site | Notes |
 |---|---|---|---|
 | `fcntl` `F_GETLK`/`F_SETLK`/`F_SETLKW`; `lockf` | `fcntl` (`151`) | `src/fcntl/fcntl.c`, `src/misc/lockf.c` | `sys_fcntl` (`sys/syscall/ffi.rs`) handles only `F_DUPFD`, `F_DUPFD_CLOEXEC`, `F_GETFD`, `F_SETFD`, `F_GETFL`, `F_SETFL`; other commands return `EINVAL`. `flock(2)` exists but is a BSD interface, not a substitute. |
-| `posix_openpt`, `grantpt`, `unlockpt`, `ptsname` | `open("/dev/ptmx")` + tty ioctls | `src/misc/pty.c` | No pseudo-terminal driver: devfs has no `/dev/ptmx` or `/dev/pts`. |
 | `truncate` | `truncate` (`76`) | `src/unistd/truncate.c` | Unpatched call site; `ftruncate` works. |
 | `waitid` | `waitid` (`247`) | `src/process/waitid.c` | `wait4` exists; `waitid` has no handler. |
 | `pselect` | `pselect6` (`270`) | `src/select/pselect.c` | `select` (`23`), `poll` (`148`) and `ppoll` (`575`) exist. |
@@ -86,6 +85,7 @@ crate.
 | POSIX interface(s) | Number(s) | Module | Commit | Notes |
 |---|---|---|---|---|
 | `setuid`, `setgid`, `seteuid`, `setegid`, `setreuid`, `setregid`, `setresuid`, `setresgid`, `getresuid`, `getresgid`, `getgroups`, `setgroups`; real, effective and saved IDs, set-user-ID `execve` | `162`/`163`, `499`-`502`, `113`/`114`, `164`/`178` | `posix_compat` | `282249f` | `SUDO.md` §5.1; `cred_syscall_smoke`. |
+| `posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `openpty` | `open("/dev/ptmx")`, `TIOCGPTN`, `TIOCSPTLCK` | kernel (`sys/tty/pty.rs`) | `63fbf11` | `PTY.md`; `pty_syscall_smoke`. |
 | `raise`, `abort`, `pthread_kill` (via `tkill`) | `200` | `signal` | `55e7e23` | |
 | `times` | `493` | `posix_compat` | `55e7e23` | Real per-process CPU time since `65d25e8`. |
 | `sigpending` | `494` | `signal` | `55e7e23` | |

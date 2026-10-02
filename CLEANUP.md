@@ -45,7 +45,6 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| No pseudo-terminals (no `/dev/ptmx`, `posix_openpt`). | ptys | v0.3.0 (`SUDO.md` §5.2.3) |
 
 ## 6. Networking
 
@@ -74,6 +73,7 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-02 — pseudo-terminals: `/dev/ptmx` and `/dev/pts/N` (`PTY.md`) — 63fbf11
 - 2026-10-01 — real, effective and saved user and group IDs, supplementary groups, set-user-ID and set-group-ID `execve` with `AT_SECURE`, `access(2)` on the real IDs, the `nosuid` mount option — 282249f
 - 2026-09-24 — `AT_RANDOM` is 16 fresh random bytes per `execve` — f97971a (branch `cleanup-easy-shortcuts`)
 - 2026-09-24 — `reboot(2)` is root-only — f97971a

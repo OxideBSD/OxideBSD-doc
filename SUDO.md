@@ -142,14 +142,15 @@ functions the port needs.
 2. `/dev/tty`, `/dev/console`, `ttyname` (§5.2.1–5.2.2); `/proc` start time and syscall 318 (§5.3).
    Done: `/dev/tty` and `/dev/console` are devfs nodes (342fda3); `ttyname` works through
    `/proc/self/fd`; `/proc/<pid>/stat` field 22 and `getrandom` at 318 (`f3d98a0`).
-3. Pseudo-terminals (§5.2.3), after `PTY.md` is written and accepted. Not started.
+3. Pseudo-terminals (§5.2.3). Done (63fbf11): `PTY.md`; `/dev/ptmx` and `/dev/pts/N`.
 4. OpenPAM (§5.4). Independent of 3. Done (093ec0e).
 5. The sudo-rs port and seeding (§6), then §7. Not started; `/etc/group` has no `wheel` yet.
 
 ## 9. Open questions
 
-1. Pseudo-terminal naming (`/dev/ptmx` + `/dev/pts/N`, which FreeBSD also uses today, or
-   BSD-style `/dev/ptyXX`) and how complete the line discipline must be. For `PTY.md`.
+1. ~~Pseudo-terminal naming and how complete the line discipline must be.~~ Resolved
+   (2026-10-02, `PTY.md`): `/dev/ptmx` and `/dev/pts/N`; the slave has the full line discipline
+   of `TTY.md`.
 2. ~~Whether OpenPAM's static-module build works as expected (§5.4.1).~~ Resolved: it does
    (093ec0e).
 3. ~~Where sudo's syslog messages go.~~ Resolved: `syslogd` reads `/dev/log` (`SYSLOG.md`, 9056be8).
