@@ -59,7 +59,7 @@ Released 2026-09-16.
 
 ### 3.2. v0.3.0: toolchain maturity, `std`, init, cleanup, sudo
 
-Scope decided 2026-09-23 (items 1-3), extended 2026-09-24 (items 4-5).
+Scope decided 2026-09-23 (items 1-3), extended 2026-09-24 (items 4-5) and 2026-10-06 (item 6).
 
 | # | Item | State |
 |---|---|---|
@@ -68,6 +68,7 @@ Scope decided 2026-09-23 (items 1-3), extended 2026-09-24 (items 4-5).
 | 3 | Native init: `/sbin/init` as a Rust `std` app, `/etc/rc`, `rc.d`, `rcorder`, `rc.conf` (`INIT.md`). | Done (`52656de`, `3e3241e`, `6899d9d`, `3295c7c`, `946dfa0`) |
 | 4 | Cleanup: OxideBSD acts like a regular OS instead of taking shortcuts. Inventory: `CLEANUP.md`. | In progress |
 | 5 | `sudo` via sudo-rs, with the kernel credentials, `/dev/tty`, pseudo-terminals and OpenPAM it needs; sudo-rs's `su` replaces BusyBox's (`SUDO.md`). | In progress: OpenPAM, getty, login and `/dev/tty` done (`093ec0e`, `fde98f6`); POSIX credentials, setuid exec and pseudo-terminals not started. |
+| 6 | A console install runs in 128 MB of RAM: the kernel stops embedding the userland (the root filesystem is a separately built disk image, plus a small mfsroot for install and recovery); oxfs reads through a block cache sized from RAM instead of a fixed 1 GiB pool; a regression test boots to login with `-m 128`. The console install is the base system, networking and OpenSSL, man pages, the editors and doom; Clang/LLVM is an optional set and is not expected to be usable at 128 MB. | Not started (decided 2026-10-06) |
 
 Decisions:
 

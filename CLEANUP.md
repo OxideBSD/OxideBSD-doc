@@ -38,7 +38,7 @@ fix lands, the row moves to §8 with its commit.
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
 | `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing (`link` already fails `EXDEV`). | `EXDEV` across filesystems | v0.3.0 |
 | `/proc` is a special case inside oxfs; no VFS layer. | A VFS with filesystems mounted on it | later |
-| Every used block of the disk is loaded into RAM at mount; the block pool is a fixed 1 GiB; `NUM_BLOCKS` is a compile-time constant. | Block cache over the disk; size from the disk | later |
+| Every used block of the disk is loaded into RAM at mount; the block pool is a fixed 1 GiB, allocated and zeroed at mount whatever the disk size; `NUM_BLOCKS` is a compile-time constant. | Block cache over the disk; size from the disk | v0.3.0 (128 MB floor) |
 | A mounted disk never picks up a newer build's files; only a reformat does. | An installer and upgrades | later (v0.10.0, packages) |
 
 ## 5. Terminals
@@ -60,7 +60,7 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| Every file on the system is embedded in the kernel's oxfs module at build time and seeded on format. | A root filesystem image built separately and installed | later (installer) |
+| Every file on the system is embedded in the kernel's oxfs module at build time and seeded on format: about 298 MiB of kernel `.rodata`, resident from boot, and copied again into the block pool. | A root filesystem image built separately; a small mfsroot for install and recovery | v0.3.0 (128 MB floor) |
 | BusyBox applets are 128 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
 | `mprotect` enforcement limited to the `mmap` window. | Everywhere | later |
