@@ -64,7 +64,6 @@ fix lands, the row moves to §8 with its commit.
 | BusyBox applets are 128 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
 | `mprotect` enforcement limited to the `mmap` window. | Everywhere | later |
-| A PIE's `brk` heap starts at its unbiased end address, low in memory, not after the randomized image; musl's allocator falls back to `mmap` when growing it fails. | The heap follows the image | later |
 | After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
 | The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
 | Only `passwd(1)` changes `/etc/master.passwd` and `/etc/passwd` (through `pam_unix`); no tool adds or removes users or groups (`adduser`, `pw`, `vipw`). | They can | v0.3.0 |
@@ -73,6 +72,8 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-06 — a PIE's `brk` heap starts after its randomized image, not at its unbiased end — 2e9a34f
+- 2026-10-06 — `MAP_FIXED`, `brk` and ELF segments are confined to the user range; the kernel heap moved to the upper half (`USERMEM.md` §5.1) — 9fb6f67, 2e9a34f
 - 2026-10-02 — pseudo-terminals: `/dev/ptmx` and `/dev/pts/N` (`PTY.md`) — 63fbf11
 - 2026-10-01 — real, effective and saved user and group IDs, supplementary groups, set-user-ID and set-group-ID `execve` with `AT_SECURE`, `access(2)` on the real IDs, the `nosuid` mount option — 282249f
 - 2026-09-24 — `AT_RANDOM` is 16 fresh random bytes per `execve` — f97971a (branch `cleanup-easy-shortcuts`)

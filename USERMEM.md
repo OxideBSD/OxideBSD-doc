@@ -28,7 +28,7 @@ the PIE window (`0x3000_0000_0000`-`0x4000_0000_0000`) and the user stack
 upper half. Under Multiboot2 (`sys/boot/multiboot2.rs`), the boot trampoline's identity map of
 physical `[0, 64 MiB)` is also kernel-only and present in every address space, at virtual
 `[0, 64 MiB)`: the boot stack lives in it. An address check against a single boundary is
-therefore not enough today; §5.1 makes it so.
+therefore not enough; §5.1 makes it so.
 
 2.2. **Faults.** A page fault in ring 0 reboots the machine, except where the user stack grows on
 demand (`mm::try_grow_user_stack`, which already runs for kernel accesses too).
@@ -44,12 +44,13 @@ other thread runs while the kernel touches user memory. This stops being true wi
 3.1. Kernel code (and module code) MUST NOT dereference a user pointer. It MUST copy data in or
 out with the routines of §4, and operate on the kernel copy.
 
-3.2. The user range is `[VM_MINUSER, VM_MAXUSER)`: `VM_MINUSER` is `0x400_0000` (64 MiB, above
-the Multiboot2 identity window, below every user load address), `VM_MAXUSER` is
-`0x8000_0000_0000` (the end of the canonical lower half). The kernel MUST NOT map anything
-kernel-only inside the user range (§5.1). A range is valid for a copy when it lies entirely
-inside the user range; whether its pages are mapped, and writable, is found by performing the
-copy (§5.2).
+3.2. The user range is `[VM_MINUSER, VM_MAXUSER)`: `VM_MINUSER` is `0x1000` (page zero stays
+unmapped, so a null pointer faults, as on the BSDs), `VM_MAXUSER` is `0x8000_0000_0000` (the end
+of the canonical lower half). Fixed-address binaries load as low as `0x20_0000` (lld's default;
+on-target `clang` and `lld` among them). The kernel MUST NOT map anything kernel-only inside the
+user range (§5.1), and MUST NOT create a user mapping outside it: `execve`'s segments, `brk` and
+`MAP_FIXED` are checked. A range is valid for a copy when it lies entirely inside the user range;
+whether its pages are mapped, and writable, is found by performing the copy (§5.2).
 
 3.3. A range that wraps around, or extends past either bound, is invalid without touching memory.
 
@@ -87,9 +88,12 @@ produces.
 5.1. **Address space layout.** The kernel heap moves from `0x4444_4444_0000` to the upper half,
 L4 slot 386 (`0xffff_c100_0000_0000`), next to the module data pool (384) and the kernel stack
 window (385). Like them it is mapped at boot, before any process exists, so every address space
-aliases its L4 entry. After the move, the only kernel-only mappings in the lower half are the
-Multiboot2 identity window, below `VM_MINUSER`. A boot-time check walks the lower half of the
-kernel's page tables and panics if any kernel-only leaf lies in the user range.
+aliases its L4 entry. The Multiboot2 path continues boot on the boot stack's alias in the direct
+map and, once the kernel's own GDT is loaded, unmaps the low identity window (PML4 slot 0). A
+boot-time check walks the lower half of the kernel's page tables and panics if any kernel-only
+leaf lies in the user range. A PIE's `brk` heap starts after its randomized image (it used to
+start at the unbiased image end, below 1 MiB, inside the Multiboot2 window). Done: `9fb6f67`,
+`2e9a34f`.
 
 5.2. **Fault recovery.** The copy routines record a recovery address before touching user memory,
 as the BSDs' `pcb_onfault` does. The ring-0 page fault handler first tries demand growth
@@ -129,8 +133,8 @@ read-only page as an output buffer; a non-canonical address.
 6.3. The existing smoke tests and the POSIX canary MUST pass unchanged: valid pointers behave as
 before.
 
-6.4. The test includes an address inside the old heap location and the Multiboot2 identity
-window, and runs under both boot paths.
+6.4. The test includes page zero, an address at the old heap location and one in the old
+Multiboot2 identity window, and runs under both boot paths.
 
 ## 7. Decisions
 
