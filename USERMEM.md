@@ -83,6 +83,37 @@ posix_compat and native_abi convert their user accesses to these.
 4.3. musl and user space are unaffected: the ABI does not change, only the errors a bad pointer
 produces.
 
+4.4. **Data transfer: `uio`.** `read`, `write` and their vector and positioned forms reach a
+descriptor's backend through a `uio`, as on the BSDs (`uio(9)`, `uiomove(9)`), never through a
+raw pointer.
+
+| Field | Meaning |
+|---|---|
+| `iov` | The segments, copied in by the system call (`readv`/`writev`: the whole array, at most `IOV_MAX`; `read`/`write`: one) |
+| `resid` | Bytes still to transfer; the call returns the original length minus `resid` |
+| `offset` | The file position to use, when `FOF_OFFSET` is set (below) |
+| `rw` | `Read` (the backend's data goes out to the segments) or `Write` (the segments' data comes in) |
+| `seg` | `User` (segments are user addresses: `copyin`/`copyout`) or `Kernel` (kernel buffers, a plain copy; no caller yet, for core dumps, `sendfile` and in-kernel file I/O) |
+
+`uiomove(kbuf, uio)` moves up to `kbuf.len()` bytes between a kernel buffer and the next part of
+the segments, in the direction `rw` gives, advancing them and lowering `resid`; it fails with
+`EFAULT` like `copyin`/`copyout`. A backend may call it as often as it likes (a pipe once per
+contiguous run of its ring buffer, a terminal once per line).
+
+The descriptor operations become `read(real_fd, uio, flags)` and `write(real_fd, uio, flags)`.
+`flags & FOF_OFFSET` asks for `uio.offset` instead of the description's own position, which
+replaces the separate `pread`/`pwrite` operations; a backend with no position (pipe, terminal,
+socket) fails it with `ESPIPE`. A `readv`/`writev` is one call into the backend, so a `writev` of
+at most `PIPE_BUF` bytes to a pipe is as atomic as a `write` of the same length, and a terminal
+read fills several segments from one line.
+
+When an operation fails after transferring some bytes, the call returns the count if the error is
+`EINTR`, `ERESTART` or `EAGAIN`, and the error otherwise (decision 3; FreeBSD's `dofileread`).
+
+Modules see a `uio` as an opaque pointer, so its layout stays the kernel's: `sys/module.rs`
+exports `oxidebsd_uiomove(kbuf, len, uio)` (0, or a positive errno), `oxidebsd_uio_resid(uio)`
+and `oxidebsd_uio_offset(uio)`.
+
 ## 5. Implementation
 
 5.1. **Address space layout.** The kernel heap moves from `0x4444_4444_0000` to the upper half,
@@ -127,6 +158,12 @@ sigaction, nanosleep, termios, iovecs, msghdr and control data, execve's argv an
 paths and every remaining module access; (4) signal frames. Each converted site loses its
 "pointer-validation gap" comment.
 
+5.6. **`uio` conversion.** The `uio` type and `uiomove` first, then the system calls (`read`,
+`write`, `readv`, `writev`, `pread`, `pwrite`, `preadv2`, `pwritev2`) build one, then every
+backend moves to the new operations in one change, since the operation types are shared: pipes
+and FIFOs, terminals and pseudo-terminals, sockets, message queues, `/dev/klog`, the devices in
+`sys/module.rs`, and oxfs (files, device nodes, `/proc`). Their `(ptr, len)` gaps go with it.
+
 ## 6. Verification
 
 6.1. A new smoke test (`usermem_syscall_smoke`), run as an unprivileged user, passes bad pointers
@@ -158,3 +195,9 @@ Made 2026-10-06.
    valid only at its start returns `EFAULT`, as on the BSDs (FreeBSD's `dofileread` masks only
    `ERESTART`, `EINTR` and `EWOULDBLOCK` after a partial transfer), not a short count as on
    Linux.
+4. **`uio` for data transfer, as on the BSDs** (2026-10-07; §4.4): one `uio` per system call
+   (vectored calls included), a kernel-segment mode from the start, modules see it opaquely
+   through exports, and `pread`/`pwrite` fold into `read`/`write` with `FOF_OFFSET`.
+   **Rationale.** A bounce buffer would cost a copy and kernel memory on every transfer (against
+   the 128 MB floor, `ROADMAP.md` v0.3.0 item 6); per-backend `uiomove` is what the BSDs do, and
+   it fixes `writev` atomicity on pipes.
