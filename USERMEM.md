@@ -1,6 +1,6 @@
 # OxideBSD user memory access: design specification
 
-Status: **draft** (2026-10-02). Target release: v0.3.0 (`CLEANUP.md` §2).
+Status: **accepted** (2026-10-06; drafted 2026-10-02). Target release: v0.3.0 (`CLEANUP.md` §2).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -25,7 +25,10 @@ and have the kernel read or overwrite kernel memory on its behalf.
 heap (`allocator::HEAP_START`, `0x4444_4444_0000`) lies in the lower canonical half, between
 the PIE window (`0x3000_0000_0000`-`0x4000_0000_0000`) and the user stack
 (`USER_STACK_TOP`, `0x5000_0000_0000`); module code, module data and kernel stacks are in the
-upper half. An address check against a single boundary is therefore not enough.
+upper half. Under Multiboot2 (`sys/boot/multiboot2.rs`), the boot trampoline's identity map of
+physical `[0, 64 MiB)` is also kernel-only and present in every address space, at virtual
+`[0, 64 MiB)`: the boot stack lives in it. An address check against a single boundary is
+therefore not enough today; §5.1 makes it so.
 
 2.2. **Faults.** A page fault in ring 0 reboots the machine, except where the user stack grows on
 demand (`mm::try_grow_user_stack`, which already runs for kernel accesses too).
@@ -41,13 +44,14 @@ other thread runs while the kernel touches user memory. This stops being true wi
 3.1. Kernel code (and module code) MUST NOT dereference a user pointer. It MUST copy data in or
 out with the routines of §4, and operate on the kernel copy.
 
-3.2. A user address range is valid for reading when every page in it is mapped with the
-user-accessible bit set (`PageTableFlags::USER_ACCESSIBLE`), or lies in a region the fault path
-would populate on demand (the user stack reserve). It is valid for writing when, in addition,
-every such page is writable. The user-accessible bit is the test: kernel mappings never carry
-it, wherever they are in the address space (§2.1).
+3.2. The user range is `[VM_MINUSER, VM_MAXUSER)`: `VM_MINUSER` is `0x400_0000` (64 MiB, above
+the Multiboot2 identity window, below every user load address), `VM_MAXUSER` is
+`0x8000_0000_0000` (the end of the canonical lower half). The kernel MUST NOT map anything
+kernel-only inside the user range (§5.1). A range is valid for a copy when it lies entirely
+inside the user range; whether its pages are mapped, and writable, is found by performing the
+copy (§5.2).
 
-3.3. A range that wraps around, or extends past the canonical lower half, is invalid.
+3.3. A range that wraps around, or extends past either bound, is invalid without touching memory.
 
 3.4. A failed copy MUST leave the system call failing with `EFAULT` (or, for signal delivery,
 the process receiving `SIGSEGV`, §5.4). It MUST NOT fault in ring 0, reboot, or partially
@@ -80,17 +84,22 @@ produces.
 
 ## 5. Implementation
 
-5.1. **Validation (first stage).** Each copy walks the caller's page tables for the range
-(§3.2), populating the stack reserve first if the range falls in it, then copies. This is sound
-while §2.4 holds: nothing can unmap a page between the walk and the copy.
+5.1. **Address space layout.** The kernel heap moves from `0x4444_4444_0000` to the upper half,
+L4 slot 386 (`0xffff_c100_0000_0000`), next to the module data pool (384) and the kernel stack
+window (385). Like them it is mapped at boot, before any process exists, so every address space
+aliases its L4 entry. After the move, the only kernel-only mappings in the lower half are the
+Multiboot2 identity window, below `VM_MINUSER`. A boot-time check walks the lower half of the
+kernel's page tables and panics if any kernel-only leaf lies in the user range.
 
-5.2. **Fault recovery (second stage, required before SMP).** The copy routines record a recovery
-address before touching user memory, as the BSDs' `pcb_onfault` does. The ring-0 page fault
-handler, after trying demand growth, returns to that address instead of rebooting when a fault
-happens inside a copy routine, and the routine returns `EFAULT`. The page-table walk of §5.1 can
-then be dropped. Faults in ring 0 outside a copy routine still reboot.
+5.2. **Fault recovery.** The copy routines record a recovery address before touching user memory,
+as the BSDs' `pcb_onfault` does. The ring-0 page fault handler first tries demand growth
+(`mm::try_grow_user_stack`, and any other demand-populated region); if that fails and the fault
+happened inside a copy routine, it returns to the recovery address and the routine returns
+`EFAULT`. A fault in ring 0 outside a copy routine still reboots. A write to a present read-only
+page faults the same way. Together with §3.2's bounds check this is the whole validation: there
+is no page-table walk.
 
-5.3. **SMAP and SMEP (third stage).** With fault recovery in place, the kernel SHOULD enable SMEP
+5.3. **SMAP and SMEP (later stage).** With fault recovery in place, the kernel SHOULD enable SMEP
 (the kernel never executes user pages) and SMAP (the kernel reads and writes user pages only
 inside the copy routines, bracketed by `stac`/`clac`), where the CPU supports them. A stray
 dereference of a user pointer then faults instead of silently working.
@@ -120,13 +129,21 @@ read-only page as an output buffer; a non-canonical address.
 6.3. The existing smoke tests and the POSIX canary MUST pass unchanged: valid pointers behave as
 before.
 
-6.4. After stage two, the same test runs again with the walk of §5.1 removed.
+6.4. The test includes an address inside the old heap location and the Multiboot2 identity
+window, and runs under both boot paths.
 
-## 7. Open questions
+## 7. Decisions
 
-1. Whether stage one (the page-table walk) is worth doing at all, or the work should go straight
-   to fault recovery (§5.2), which SMP needs anyway and which handles demand growth naturally.
-2. Where the per-call bound for `copyin_vec` comes from: a fixed 1 MiB, `PATH_MAX` for paths, or
-   per call.
-3. Whether a partial `read` into a buffer that is valid only for its first part returns the bytes
-   that fit (as Linux does) or `EFAULT` for the whole call (as the BSDs do).
+Made 2026-10-06.
+
+1. **No page-table walk; the heap moves.** Validation is a bounds check plus fault recovery
+   (§5.1, §5.2), as on the BSDs. **Rationale.** Fault recovery is needed before SMP anyway and
+   handles demand-grown regions naturally; a page-table walk would be thrown away. It is only
+   sound once nothing kernel-only remains in the user range, which moving the heap achieves.
+2. **`copyin_vec` takes a per-call bound.** Paths use `PATH_MAX` and fail with `ENAMETOOLONG`;
+   `execve`'s arguments use `ARG_MAX` (`E2BIG`); every other caller passes its own. **Rationale.**
+   Matches `copyinstr(9)`'s `maxlen`, and keeps each call's POSIX error.
+3. **A partially valid buffer fails the whole call with `EFAULT`.** A `read` whose buffer is
+   valid only at its start returns `EFAULT`, as on the BSDs (FreeBSD's `dofileread` masks only
+   `ERESTART`, `EINTR` and `EWOULDBLOCK` after a partial transfer), not a short count as on
+   Linux.
