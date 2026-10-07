@@ -95,13 +95,20 @@ leaf lies in the user range. A PIE's `brk` heap starts after its randomized imag
 start at the unbiased image end, below 1 MiB, inside the Multiboot2 window). Done: `9fb6f67`,
 `2e9a34f`.
 
-5.2. **Fault recovery.** The copy routines record a recovery address before touching user memory,
-as the BSDs' `pcb_onfault` does. The ring-0 page fault handler first tries demand growth
+5.2. **Fault recovery.** The copy routines have a recovery address: the instruction that touches
+user memory lies between two labels, and a fault there resumes at a third, which returns `EFAULT`
+(an exception table keyed on the faulting instruction, as Linux does, rather than the BSDs'
+per-thread `pcb_onfault`; it needs no per-thread or per-CPU state). The ring-0 page fault handler
+first tries demand growth
 (`mm::try_grow_user_stack`, and any other demand-populated region); if that fails and the fault
 happened inside a copy routine, it returns to the recovery address and the routine returns
 `EFAULT`. A fault in ring 0 outside a copy routine still reboots. A write to a present read-only
 page faults the same way. Together with §3.2's bounds check this is the whole validation: there
 is no page-table walk.
+
+Done: `sys/memory/usercopy.rs` (`copyin`, `copyout`, `copyin_val`, `copyout_val`, `copyin_vec`;
+`oxidebsd_copyin`/`oxidebsd_copyout` for modules). Entering the kernel also clears the direction
+flag now (`SYSCALL`'s `SFMASK`, `0af78c0`): with it set, the copies ran backwards.
 
 5.3. **SMAP and SMEP (later stage).** With fault recovery in place, the kernel SHOULD enable SMEP
 (the kernel never executes user pages) and SMAP (the kernel reads and writes user pages only
