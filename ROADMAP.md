@@ -113,6 +113,20 @@ Phase 3 from the Rust side: `rustc`, `cargo`, a linker and an assembler running 
 processes, able to rebuild OxideBSD's kernel and userland on target. Builds on v0.3.0's `std`
 target.
 
+Also in v0.6.0 (decided 2026-10-06): a POSIX conformance suite that checks all of POSIX.1-2024,
+replacing the Open POSIX Test Suite pilot as the conformance measure.
+
+- **Assertion-based, hybrid.** An inventory gives every requirement of the standard (each "shall",
+  each RETURN VALUE and ERRORS entry, each option group's additions) an ID tied to its section;
+  coverage is reported against the inventory, so untested requirements are visible. Our own tests
+  fill it; tests from existing suites (the Open POSIX Test Suite, the FreeBSD and NetBSD ATF
+  suites) are linked to the assertions they already cover. The inventory cites and paraphrases
+  the standard, never copies it.
+- **Its own repository, OS-neutral:** portable C and a runner that work on any Unix. Every test is
+  validated on FreeBSD, NetBSD, OpenBSD and Linux; OxideBSD vendors the suite.
+- **Order:** XBD headers, then XSH interfaces, then the XCU shell, then the XCU utilities.
+- A design specification comes first, for review.
+
 ### 3.6. v0.7.0: oxlibc
 
 OxideBSD's own from-scratch libc, BSD-3-Clause, alongside the musl and glibc ports rather than
