@@ -1,6 +1,6 @@
 # OxideBSD user memory access: design specification
 
-Status: **accepted** (2026-10-06; drafted 2026-10-02). Target release: v0.3.0 (`CLEANUP.md` §2).
+Status: **accepted** (2026-10-06; drafted 2026-10-02). Implemented through §5.5 (2026-10-08); §5.3 open. Target release: v0.3.0 (`CLEANUP.md` §2).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -157,7 +157,11 @@ an arbitrary pointer and a write (read, pread, ioctl, getsockopt, getresuid, sys
 pipe, clock_gettime, the stat family, uname, getrandom...); (2) structure inputs (setsockopt,
 sigaction, nanosleep, termios, iovecs, msghdr and control data, execve's argv and envp); (3)
 paths and every remaining module access; (4) signal frames. Each converted site loses its
-"pointer-validation gap" comment.
+"pointer-validation gap" comment. Done (2026-10-07/08): `10eb730` (first conversions), `3cbd575` (`read`/`write`
+through `uio`), `8c6b850` (output buffers), `b2102e5` (IPC), `900a8da` (signals, `poll`/`select`),
+`76403a1` (`execve`), `5a30fda` (signal frames), `2cab95b` (oxfs; exec opens and reads in kernel
+space), `b4d94a7` (sockets, credentials, `sysctl`, `sethostname`, which had no gap comment). No
+raw user access remains; SMAP (§5.3) would now catch one that slipped in.
 
 5.6. **`uio` conversion.** The `uio` type and `uiomove` first, then the system calls (`read`,
 `write`, `readv`, `writev`, `pread`, `pwrite`, `preadv2`, `pwritev2`) build one, then every

@@ -16,7 +16,6 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| Syscalls dereference user pointers without validating them (`sys_read`/`sys_write` and others); a bad pointer faults instead of returning `EFAULT`. | `copyin`/`copyout` with `EFAULT` | v0.3.0 |
 | No `NO_EXECUTE` on any page, no W^X; module pages all writable; ELF segments sharing a page don't union their flags. | NX stacks and data, read-only text | later |
 
 ## 3. Processes and signals
@@ -72,6 +71,7 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-08 — system calls copy user memory through `copyin`/`copyout` (`EFAULT` for a bad pointer, never a kernel fault), `read`/`write` through `uio` (`USERMEM.md`) — 10eb730 … b4d94a7
 - 2026-10-06 — a PIE's `brk` heap starts after its randomized image, not at its unbiased end — 2e9a34f
 - 2026-10-06 — `MAP_FIXED`, `brk` and ELF segments are confined to the user range; the kernel heap moved to the upper half (`USERMEM.md` §5.1) — 9fb6f67, 2e9a34f
 - 2026-10-02 — pseudo-terminals: `/dev/ptmx` and `/dev/pts/N` (`PTY.md`) — 63fbf11

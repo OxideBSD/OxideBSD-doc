@@ -43,9 +43,9 @@ release that closes it (`ROADMAP.md`, `CLEANUP.md`).
 
 | Tool | Defence | Gap / Target |
 |---|---|---|
-| A pointer argument aimed at kernel memory, an unmapped page, a read-only page, page zero or a non-canonical address | `copyin`/`copyout` bounds-check against `[VM_MINUSER, VM_MAXUSER)` and recover from faults with `EFAULT` (`USERMEM.md`) | Done across the kernel and its modules, oxfs in progress (2026-10-07) |
+| A pointer argument aimed at kernel memory, an unmapped page, a read-only page, page zero or a non-canonical address | `copyin`/`copyout` bounds-check against `[VM_MINUSER, VM_MAXUSER)` and recover from faults with `EFAULT` (`USERMEM.md`) | Done across the kernel and its modules (`b4d94a7`, 2026-10-08) |
 | Reading a value twice from user memory while another thread changes it | Every value is copied in once and used from the kernel copy (`USERMEM.md` §3.5) | — |
-| A huge length or count, to make the kernel allocate | Bounded before allocating: `IOV_MAX` (iovecs), `kern.maxfiles` (`poll`), `PATH_MAX` (paths), `MAX_EXEC_ARG_BYTES` (`execve`), message size limits (message queues, `msgsnd`) | Every new length MUST be bounded the same way |
+| A huge length or count, to make the kernel allocate | Bounded before allocating: `IOV_MAX` (iovecs), `kern.maxfiles` (`poll`), `PATH_MAX` (paths), `MAX_EXEC_ARG_BYTES` (`execve`), message size limits (message queues, `msgsnd`), 1 MiB chunks (`sendmsg`), 256 bytes (socket addresses), 4 KiB (socket options, `sysctl` values) | Every new length MUST be bounded the same way |
 | An unregistered system call number | `ENOSYS` | — |
 | Flags or values out of range | Checked per call (`EINVAL`) | Not audited systematically |
 
