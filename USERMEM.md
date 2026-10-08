@@ -93,7 +93,7 @@ raw pointer.
 | `resid` | Bytes still to transfer; the call returns the original length minus `resid` |
 | `offset` | The file position to use, when `FOF_OFFSET` is set (below) |
 | `rw` | `Read` (the backend's data goes out to the segments) or `Write` (the segments' data comes in) |
-| `seg` | `User` (segments are user addresses: `copyin`/`copyout`) or `Kernel` (kernel buffers, a plain copy; no caller yet, for core dumps, `sendfile` and in-kernel file I/O) |
+| `seg` | `User` (segments are user addresses: `copyin`/`copyout`) or `Kernel` (kernel buffers, a plain copy: a module's I/O on its own descriptors, such as oxfs's format self-check, and later core dumps, `sendfile` and in-kernel file I/O) |
 
 `uiomove(kbuf, uio)` moves up to `kbuf.len()` bytes between a kernel buffer and the next part of
 the segments, in the direction `rw` gives, advancing them and lowering `resid`; it fails with
@@ -111,8 +111,9 @@ When an operation fails after transferring some bytes, the call returns the coun
 `EINTR`, `ERESTART` or `EAGAIN`, and the error otherwise (decision 3; FreeBSD's `dofileread`).
 
 Modules see a `uio` as an opaque pointer, so its layout stays the kernel's: `sys/module.rs`
-exports `oxidebsd_uiomove(kbuf, len, uio)` (0, or a positive errno), `oxidebsd_uio_resid(uio)`
-and `oxidebsd_uio_offset(uio)`.
+exports `oxidebsd_uiomove(kbuf, len, uio)` (the count moved, or `-errno`), `oxidebsd_uio_resid(uio)`
+and `oxidebsd_uio_offset(uio)`, and `oxidebsd_uio_kernel_new(buf, len, rw)`/`oxidebsd_uio_free(uio)`
+for a module that calls its own operations on its own buffers.
 
 ## 5. Implementation
 
