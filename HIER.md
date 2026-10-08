@@ -64,6 +64,7 @@ Clang's resource directory is `/usr/lib/clang/23`.
 |-----------|----------|
 | `/usr/libexec` | `getty` (`libexec/getty`) |
 | `/usr/games` | `doom` (`external/gpl2/doomgeneric`) |
+| `/usr/share/games/doom` | `doom1.wad` (the shareware IWAD; doomgeneric's `FILES_DIR`) |
 | `/lib` | `libc.so`, `ld-musl-x86_64.so.1` -> `libc.so`, `libgcc_s.so.1` |
 | `/usr/lib` | `libc.so` and `libgcc_s.so` (links into `/lib`) |
 | `/usr/tests` | `float-smoke`, `musl`, `smoke`, `std-hello`, `std-hello-oxidebsd`, `std-process-fs-oxidebsd`, `std-thread-net-signal-oxidebsd` |
