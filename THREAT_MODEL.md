@@ -64,7 +64,7 @@ release that closes it (`ROADMAP.md`, `CLEANUP.md`).
 |---|---|---|
 | Mapping over kernel memory (`MAP_FIXED`, `brk`, ELF segments) | User mappings are confined to the user range; `munmap` skips kernel-only pages (`2e9a34f`) | — |
 | A user page left writable and executable, or executing data | — | **Gap: no `NX` anywhere, no W^X** (later) |
-| The kernel executing or reading user pages by mistake | — | **Gap: SMEP and SMAP not enabled** (`USERMEM.md` §5.3) |
+| The kernel executing or reading user pages by mistake | SMEP and SMAP where the CPU has them; AC cleared at every kernel entry (`046a164`) | **Gap** on CPUs without them (pre-Haswell SMEP, pre-Broadwell SMAP): they boot unprotected |
 | Guessing addresses | PIE executables get a randomised load bias (`process::aslr`) | **Gap:** fixed-address executables (BusyBox, the C ports) and the kernel itself are at fixed addresses: no KASLR |
 | `mprotect` to change protections | Enforced in the `mmap` window | **Gap:** elsewhere it does nothing (later) |
 | A null dereference reaching mapped memory | Page zero is never mapped (`VM_MINUSER = 0x1000`) | — |
@@ -149,5 +149,5 @@ direction flag can't make the kernel copy backwards; an unwritable signal frame 
 ## 6. Open questions
 
 1. Fuzzing: a syzkaller-style system call fuzzer, and a packet fuzzer for the network stack.
-2. Order of the hardware protections: NX and W^X, SMEP/SMAP, KPTI.
+2. Order of the remaining hardware protections: NX and W^X, KPTI.
 3. Whether KASLR is worth it before every executable is a PIE.

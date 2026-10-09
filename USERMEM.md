@@ -1,6 +1,6 @@
 # OxideBSD user memory access: design specification
 
-Status: **accepted** (2026-10-06; drafted 2026-10-02). Implemented through §5.5 (2026-10-08); §5.3 open. Target release: v0.3.0 (`CLEANUP.md` §2).
+Status: **accepted** (2026-10-06; drafted 2026-10-02). Implemented (2026-10-08), §5.3 included. Target release: v0.3.0 (`CLEANUP.md` §2).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -142,10 +142,13 @@ Done: `sys/memory/usercopy.rs` (`copyin`, `copyout`, `copyin_val`, `copyout_val`
 `oxidebsd_copyin`/`oxidebsd_copyout` for modules). Entering the kernel also clears the direction
 flag now (`SYSCALL`'s `SFMASK`, `0af78c0`): with it set, the copies ran backwards.
 
-5.3. **SMAP and SMEP (later stage).** With fault recovery in place, the kernel SHOULD enable SMEP
+5.3. **SMAP and SMEP.** With fault recovery in place, the kernel SHOULD enable SMEP
 (the kernel never executes user pages) and SMAP (the kernel reads and writes user pages only
 inside the copy routines, bracketed by `stac`/`clac`), where the CPU supports them. A stray
-dereference of a user pointer then faults instead of silently working.
+dereference of a user pointer then faults instead of silently working. Done (`046a164`): enabled where CPUID reports them (QEMU needs `OXIDEBSD_QEMU_CPU=max`);
+every interrupt and exception entry clears AC, which interrupt delivery leaves as ring 3 set it. On
+first run SMAP caught three raw accesses the conversions had missed: `ioctl`'s argument, `clone`'s
+`CLONE_PARENT_SETTID` write, and the fault trampoline page's slots.
 
 5.4. **Signal delivery.** Building a signal frame on the user stack, and `sigreturn` reading it
 back, go through `copyout`/`copyin`. A frame that can't be written delivers `SIGSEGV` with the
