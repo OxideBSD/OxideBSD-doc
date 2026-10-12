@@ -67,11 +67,12 @@ Clang's resource directory is `/usr/lib/clang/23`.
 | `/usr/share/games/doom` | `doom1.wad` (the shareware IWAD; doomgeneric's `FILES_DIR`) |
 | `/lib` | `libc.so`, `ld-musl-x86_64.so.1` -> `libc.so`, `libgcc_s.so.1` |
 | `/usr/lib` | `libc.so` and `libgcc_s.so` (links into `/lib`) |
-| `/usr/tests` | `float-smoke`, `musl`, `smoke`, `std-hello`, `std-hello-oxidebsd`, `std-process-fs-oxidebsd`, `std-thread-net-signal-oxidebsd` |
-| `/usr/tests/*` | `bin/run.sh`, `cron/run.sh`, `devfs/run.sh`, `init/init-smoke`, `net/run.sh`, `net/loopback-smoke`, `openssl/run.sh`, `openssl/openssl-smoke`, `openssl/openssl-rs-smoke`, `rc/run.sh`, `syslog/run.sh`, `tz/run.sh`, `tz/tz-smoke` |
+| `/usr/tests` | `float-smoke`, `musl`, `smoke`, `std-hello-oxidebsd`, `std-process-fs-oxidebsd`, `std-thread-net-signal-oxidebsd` |
+| `/usr/tests/*` | `aslr/pie-aslr-probe`, `at/at-smoke`, `bin/run.sh`, `cred/cred-smoke`, `cron/run.sh`, `devfs/run.sh`, `dynlink/dynlink-smoke`, `dynlink/dynlink-pie-smoke`, `fd/fd-smoke`, `init/init-smoke`, `ipc/sem-open-smoke`, `net/run.sh`, `net/loopback-smoke`, `net/socket-smoke`, `openssl/run.sh`, `openssl/openssl-smoke`, `openssl/openssl-rs-smoke`, `oxfs/hello.txt`, `oxfs/big.txt`, `pagecache/pagecache-smoke`, `poll/ppoll-smoke`, `posix/run.sh` (and the pilot corpus), `pthread/pthread-smoke`, `pthread/pthread-cancel-crash`, `pthread/pshared-cond-crash`, `rc/run.sh`, `sh/run.sh` (and the shell corpus), `syslog/run.sh`, `sysctl/sysctl-smoke`, `tty/tty-smoke`, `tz/run.sh`, `tz/tz-smoke` |
+| `/usr/share/examples` | `clang/hello.c`, `clang/hello.cpp`, `ninja/` (a two-file ninja project) |
 
-`/usr/tests` holds regression fixtures, not on any `PATH`. Test files still in `/`
-(`/posix-tests`, `/sh-smoke`, `/ninja-demo`) are to move there (`hier(7)` CAVEATS).
+`/usr/tests` holds regression fixtures, not on any `PATH`. Nothing but the hierarchy's own
+directories is seeded in `/`.
 
 ## 7. Removed programs
 
