@@ -16,7 +16,6 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| No `NO_EXECUTE` on any page, no W^X; module pages all writable; ELF segments sharing a page don't union their flags. | NX stacks and data, read-only text | later |
 
 ## 3. Processes and signals
 
@@ -71,6 +70,7 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-11 — NX and W^X: no page writable and executable, kernel (Limine and Multiboot2) or user, with OpenBSD's `wxneeded`/`wxallowed` escape hatch; `mprotect` across the user range; fixture linker scripts page-aligned — 4f0c6d1, 4e2d6fd, d838d47, 13829d6, 6cc872c, 606e5b1
 - 2026-10-11 — test fixtures and samples out of `/` (into `/usr/tests`, `/usr/share/examples`); the borrowed-std spike and `/test_busybox.sh` removed; the `hello` module no longer loaded at boot — 2d65b62, b7ac29d
 - 2026-10-08 — system calls copy user memory through `copyin`/`copyout` (`EFAULT` for a bad pointer, never a kernel fault), `read`/`write` through `uio` (`USERMEM.md`) — 10eb730 … b4d94a7
 - 2026-10-06 — a PIE's `brk` heap starts after its randomized image, not at its unbiased end — 2e9a34f

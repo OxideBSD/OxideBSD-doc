@@ -63,10 +63,14 @@ release that closes it (`ROADMAP.md`, `CLEANUP.md`).
 | Tool | Defence | Gap / Target |
 |---|---|---|
 | Mapping over kernel memory (`MAP_FIXED`, `brk`, ELF segments) | User mappings are confined to the user range; `munmap` skips kernel-only pages (`2e9a34f`) | — |
-| A user page left writable and executable, or executing data | — | **Gap: no `NX` anywhere, no W^X** (later) |
+| Executing data: injected code on the stack, heap, `.data`, an `mmap` page | `EFER.NXE` (`cpu::nx`): every user page is `NO_EXECUTE` unless it is an ELF `PF_X` segment or mapped `PROT_EXEC` | **Gap:** a CPU without NX, or with it disabled in firmware, boots with a warning and no defence |
+| A page writable and executable at once (W^X) | `mmap`/`mprotect` asking for `PROT_WRITE \| PROT_EXEC` fail with `ENOTSUP` and are logged (`kern.wxabort=1` adds `SIGABRT`), as on OpenBSD. Code must be written, then `mprotect`ed to `PROT_READ \| PROT_EXEC`. Escape hatch: a program linked `-z wxneeded` (`PT_OXIDEBSD_WXNEEDED`) run from a `wxallowed` mount | **Gap:** a program whose `PT_GNU_STACK` has `PF_X` gets a writable and executable stack, without the escape hatch (a deliberate choice, logged). ELF segments sharing a page get the union of their permissions; a page that ends up W+X is mapped and logged (none in the build as of `606e5b1`) |
+| Writing to code or read-only data | `.text` and `.rodata` are mapped read-only; `CR0.WP` binds the kernel too | — |
+| The kernel's own pages writable and executable | No kernel page is both (`memory::wx`, an audit at boot and after the modules load, like Linux's `CONFIG_DEBUG_WX`): the direct map, heap, kernel stacks, MMIO and module data are `NO_EXECUTE`; module text is read-only; the GOT read-only after relocation; under Multiboot2 the image's 2 MiB pages are split per section | — |
 | The kernel executing or reading user pages by mistake | SMEP and SMAP where the CPU has them; AC cleared at every kernel entry (`046a164`) | **Gap** on CPUs without them (pre-Haswell SMEP, pre-Broadwell SMAP): they boot unprotected |
 | Guessing addresses | PIE executables get a randomised load bias (`process::aslr`) | **Gap:** fixed-address executables (BusyBox, the C ports) and the kernel itself are at fixed addresses: no KASLR |
-| `mprotect` to change protections | Enforced in the `mmap` window | **Gap:** elsewhere it does nothing (later) |
+| `mprotect` to change protections | Enforced across the user range, all or nothing; `EACCES` for `PROT_WRITE` on a shared page its owner doesn't allow writing (`MAY_WRITE_LEAF`: a `MAP_SHARED` mapping of a file open read-only, an `SHM_RDONLY` attachment) | Found and fixed (2026-10-11): such a page could be made writable, changing every other mapping's frames |
+| A `PROT_NONE` page across `fork` | `PROT_NONE` is a non-present leaf that keeps its frame (`PROT_NONE_LEAF`), copied by `fork` and freed by teardown | Found and fixed (2026-10-11): it was a present leaf without `USER_ACCESSIBLE`, which `fork` aliased into the child; the child could free the frame while the parent still mapped it (`d838d47`) |
 | A null dereference reaching mapped memory | Page zero is never mapped (`VM_MINUSER = 0x1000`) | — |
 
 ### 3.4. Kernel information leaks
@@ -139,15 +143,31 @@ assert).
 
 4.6. A change that adds a tool to §3, or removes a defence, MUST update this document.
 
+4.7. Every new mapping MUST be `NO_EXECUTE` (`cpu::nx::no_execute()`) unless it holds code, and
+no mapping may be writable and executable at once. The boot audit (`memory::wx`) MUST report no
+writable and executable kernel pages.
+
+4.8. A page-table walk MUST NOT take a non-`USER_ACCESSIBLE` entry in the user range for
+kernel-owned: nothing kernel-only is mapped there. Software bits mark what a leaf is
+(`SHARED_LEAF`, `CACHED_LEAF`, `PROT_NONE_LEAF`, `MAY_WRITE_LEAF`).
+
 ## 5. Verification
 
 5.1. `tests/usermem_syscall_smoke.rs`: bad pointers to every converted call get `EFAULT`; the
 direction flag can't make the kernel copy backwards; an unwritable signal frame is `SIGSEGV`.
 
-5.2. The POSIX canary, unchanged by each hardening step (127 / 173 as of 2026-10-07).
+5.2. The POSIX canary, unchanged by each hardening step (127 / 173 as of 2026-10-07; 126 / 173
+from 2026-10-11, losing `mmap/5-1.c`, which treats a refused `PROT_READ | PROT_WRITE |
+PROT_EXEC` as a failure although POSIX lets `mmap` refuse a combination it doesn't support).
+
+5.3. `tests/wx_syscall_smoke.rs`: calling an `mmap` page, the stack, `.data` and the `brk` heap
+is `SIGSEGV`, and so is writing `.text`; W|X from `mmap` and `mprotect` is `ENOTSUP`; written code
+`mprotect`ed to RX runs; `PROT_NONE` pages are copied by `fork`; `mprotect` works on `.data`;
+an `SHM_RDONLY` attachment can't be made writable; W|X only for a `wxneeded` program on a
+`wxallowed` mount. The boot log's `[wx]` lines report the kernel audit.
 
 ## 6. Open questions
 
 1. Fuzzing: a syzkaller-style system call fuzzer, and a packet fuzzer for the network stack.
-2. Order of the remaining hardware protections: NX and W^X, KPTI.
+2. Order of the remaining hardware protections: KPTI next (NX and W^X landed 2026-10-11).
 3. Whether KASLR is worth it before every executable is a PIE.
