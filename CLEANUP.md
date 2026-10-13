@@ -36,7 +36,6 @@ fix lands, the row moves to §8 with its commit.
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
 | `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing (`link` already fails `EXDEV`). | `EXDEV` across filesystems | v0.3.0 |
 | `/proc` is a special case inside oxfs; no VFS layer. | A VFS with filesystems mounted on it | later |
-| `fsck_oxfs` frees files and directories that lost their names; there is no `lost+found` to reconnect them to. | Reconnected in `lost+found` | v0.3.0 |
 | `reboot(2)` always writes delayed blocks (its Linux magic numbers carry no `RB_NOSYNC`), so `reboot -q -n` syncs anyway. | `RB_NOSYNC` honoured | later |
 | Disk writes from mapping, exec, close and other non-syscall paths into oxfs still poll the disk with interrupts masked (`fslock::Guard::for_call`); only syscall dispatch and descriptor reads and writes sleep. | Every path sleeps | v0.5.0 (SMP rework) |
 | One data disk, found once at boot; the memory disk has no `/dev` node. | A block layer with every disk | later |
@@ -73,6 +72,7 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-13 — `fsck_oxfs` freed files that lost their names: reconnected in `/lost+found` as `#<inode>` (made at format, or by fsck when missing) — 61dab9e
 - 2026-10-13 — every used disk block loaded into a fixed 1 GiB RAM pool at mount, `NUM_BLOCKS` compile-time: a RAM-sized buffer cache over the whole partition, demand reads, delayed writes in crash-safe order, sleeping disk I/O under a filesystem lock, a read-only root checked by `fsck_oxfs` (`RAM_FLOOR.md` piece A) — c6b3691 … f7bf9c9
 - 2026-10-11 — NX and W^X: no page writable and executable, kernel (Limine and Multiboot2) or user, with OpenBSD's `wxneeded`/`wxallowed` escape hatch; `mprotect` across the user range; fixture linker scripts page-aligned — 4f0c6d1, 4e2d6fd, d838d47, 13829d6, 6cc872c, 606e5b1
 - 2026-10-11 — test fixtures and samples out of `/` (into `/usr/tests`, `/usr/share/examples`); the borrowed-std spike and `/test_busybox.sh` removed; the `hello` module no longer loaded at boot — 2d65b62, b7ac29d
