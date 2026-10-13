@@ -59,11 +59,15 @@ already computes it) and `oxidebsd_block_device_blocks() -> u64` (the device's c
 3.1.2. The buffer cache is `clamp(RAM / 8, 2 MiB, 512 MiB)` of buffers, allocated once in
 `module_init` with `oxidebsd_module_alloc_zeroed`: 16 MiB (4096 buffers) at 128 MB.
 
-3.1.3. The filesystem size is no longer `NUM_BLOCKS`. `format` takes it from the device
-capacity and records it in the superblock; mount reads it from there. Block numbers stay `u32`.
-The block-used bitmap is held in memory as **bits** (32 KiB per GiB of disk), allocated at mount
-(still inside `module_init`) and read from disk in full at mount: it is metadata the allocator
-needs on every allocation, and small.
+3.1.3. The filesystem size is no longer `NUM_BLOCKS`. `format` takes it from the partition's
+size and records it in the superblock; mount reads it from there. Block numbers stay `u32`.
+The block-used bitmap is **paged through the cache** like any other metadata block (FFS
+cylinder-group style), so its RAM cost doesn't grow with the disk; a small resident array holds
+each bitmap block's free count, so allocation skips full regions without reading them.
+
+3.1.3.1. **No disk**: the kernel provides a memory-backed block device (an `md(4)` precursor,
+`RAM / 4`), which oxfs formats and uses exactly as a disk, through the same cache. Piece C's
+mfsroot reuses it.
 
 3.1.4. tmpfs keeps a fixed in-memory pool, sized `clamp(RAM / 16, 8 MiB, 64 MiB)` at boot. Its
 blocks never pass through the cache. tmpfs block numbers start at a fixed base above any disk
@@ -162,8 +166,8 @@ root filesystem **read-only** at boot; `/etc/rc` runs `fsck_oxfs -p` (preen) whe
 is clear, and stops in single-user mode if preening can't repair it; it then remounts the root
 read-write (`mount -u -o rw /`). Prerequisites, each its own commit:
 
-- a raw disk device in devfs (`/dev/vtbd0` for virtio-blk, `/dev/ada0` for IDE; FreeBSD names),
-  registered with `make_dev`, readable and writable only by root;
+- raw disk devices in devfs (§3.4.5), registered with `make_dev`, readable and writable only
+  by root;
 - read-only mounts (`MNT_RDONLY`: every modifying operation returns `EROFS`) and the root mounted
   read-only at boot;
 - `mount -u` (`MNT_UPDATE`) from read-only to read-write. The upgrade MUST invalidate the whole
@@ -171,6 +175,26 @@ read-write (`mount -u -o rw /`). Prerequisites, each its own commit:
 
 Once piece B's shared format crate exists, the same checker also builds for the host and checks
 image files.
+
+3.4.5. **Disks, partitions and the root device** (decided 2026-10-12):
+
+- Disk names are OxideBSD's own, by bus: `nvme0`, `sata0`, `virt0` (virtio-blk), `sda0` (SCSI
+  and USB mass storage), `mmc0`, `ide0`.
+- Disks are partitioned. GPT partitions are `<disk>p<N>` (`virt0p1`), MBR partitions
+  `<disk>s<N>` (`ide0s1`; the four primary entries, no extended/logical yet). oxfs gets its own
+  GPT partition type GUID (generated once, recorded here) and an MBR type byte. oxfs lives in a
+  partition, never on a whole disk.
+- A blank disk is partitioned and formatted (a GPT with one oxfs partition) **only** when the
+  kernel is booted with an explicit flag (`format-blank`), which the QEMU runner passes for test
+  and dev disks. Real hardware is never partitioned by the kernel on its own.
+- **`/etc/fstab`**, BSD format (device, mount point, type, options, dump, pass). `/etc/rc` runs
+  `fsck -p` (a front end dispatching to `fsck_oxfs` by type) for every pass > 0 entry, then
+  `mount -a`.
+- The kernel finds the root filesystem from **`/boot/fsconf`**, a versioned binary form of
+  `/etc/fstab` produced by `fsconf_mkdb(8)` (run explicitly after editing fstab, like
+  `pwd_mkdb`). Limine loads it beside the kernel as a boot module, so it's readable before any
+  filesystem is mounted; the boot partition carries the copy. Without it (or with no matching
+  disk) the root is the RAM disk (§3.1.3.1). Its format gets its own short specification.
 
 3.4.4. The superblock layout changes (size, clean flag): `SUPERBLOCK_VERSION` MUST be bumped.
 Existing disks are reformatted.
@@ -221,9 +245,11 @@ inode number and the mount table are unchanged: they sit above `read_block`/`wri
 5. `update(8)` and its rc.d script.
 6. The oxfs filesystem lock (§3.5.2), still with polled I/O.
 7. Interrupt-driven, sleeping disk I/O for virtio-blk and IDE DMA (§3.5.1).
-8. Raw disk devices in devfs.
-9. Read-only mounts, the read-only root at boot, `mount -u` to read-write (§3.4.3).
-10. `fsck_oxfs` and its `/etc/rc` step.
+8. Raw disk devices in devfs, GPT and MBR partitions, the oxfs partition type, `format-blank`
+   (§3.4.5).
+9. `/etc/fstab`, `fsconf_mkdb(8)`, `/boot/fsconf` as a Limine module, root selection.
+10. Read-only mounts, the read-only root at boot, `mount -u` to read-write (§3.4.3).
+11. `fsck_oxfs`, the `fsck(8)` front end and its `/etc/rc` step.
 
 ## 4. Piece B: the host image builder (outline)
 
@@ -258,4 +284,6 @@ Decided 2026-10-12; a full specification follows piece A.
 2026-10-12: write-back with synchronous metadata (§3.3), a userland `update(8)` rather than
 kernel threads, `fsck_oxfs` in `/sbin` (§3.4.3), blocking disk I/O (§3.5), host `makefs` with a
 shared format crate, sets `base`/`clang`/`tests`, the dev disk upgraded in place with local
-changes detected by manifest hash (§4).
+changes detected by manifest hash (§4); the bitmap paged through the cache, a RAM disk when there
+is no disk, own disk names, GPT and MBR partitions, `/etc/fstab` compiled to `/boot/fsconf` for
+root selection, kernel partitioning only under `format-blank` (§3.4.5).
