@@ -120,6 +120,9 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `vm.pagecache.misses` | unsigned long | read | pages read into the cache since boot |
 | `vm.pagecache.limit` | unsigned int | read | frames files no process uses may hold |
 | `vm.pagecache.list` | string | read | a line per entry: inode, size, frames held, uses |
+| `vm.pmap.pti` | int | read | 1 when kernel page-table isolation is active (Meltdown mitigation, `THREAT_MODEL.md` §3.4); also `machdep.kpti` and `hw.meltdown`, one state under three names |
+| `machdep.kpti` | int | read | alias of `vm.pmap.pti` |
+| `hw.meltdown` | int | read | alias of `vm.pmap.pti` |
 | `debug.syscall.stats` | string | read | calls, wall and CPU time per system call since boot or the last reset |
 | `debug.syscall.reset` | int | read-write | writing a non-zero value zeroes `debug.syscall.stats`; reads 0 |
 | `kern.tty.pty_max` | int | read-write, tunable | most pseudo-terminals at once (`PTY.md` §2.4), default 256 |

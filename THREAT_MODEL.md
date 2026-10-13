@@ -78,7 +78,7 @@ release that closes it (`ROADMAP.md`, `CLEANUP.md`).
 | Tool | Defence | Gap / Target |
 |---|---|---|
 | Padding bytes in structures copied out | Copied-out types are `Pod`: no implicit padding, explicit zeroed fields instead. Found and fixed: `sysinfo` (8 bytes), `ipc_perm` (4), `stack_t` (4) | Every new copied-out type MUST be `Pod` with a size assert |
-| Reading kernel memory through the CPU (Meltdown-class) | — | **Gap:** kernel mappings are present in every process's page tables (no KPTI); on CPUs vulnerable to Meltdown, user code can read kernel memory |
+| Reading kernel memory through the CPU (Meltdown-class) | KPTI (`cpu::pti`): ring 3 runs on a second page table that maps only the entry area and the process's own user pages, never the rest of the kernel, so a speculative read of a kernel address has no translation to resolve. On by default for a `GenuineIntel` CPU without `RDCL_NO`, off otherwise; `pti=`/`kpti=`/`meltdown=` on\|off override it, and `vm.pmap.pti`/`machdep.kpti`/`hw.meltdown` report the state. Only the entry stubs, the IDT/GDT/TSS and the trampoline stacks are mapped during a transition; CR3 switches on every entry and exit (NMI/#DF/#MC save and restore CR3 on their IST stacks). PCID, where the CPU has it, keeps the kernel TLB across a syscall and flushes only the user TLB on return. A boot audit (`[kpti]`) confirms the user table maps nothing of the kernel outside the entry area, and `meltdown-poc` checks it from a live process | **Gap:** no KASLR (§3.3), so whatever leaks through some other channel is at a known address. Other speculative classes (Spectre, L1TF, MDS) are not mitigated |
 
 ### 3.5. Privilege
 
@@ -124,8 +124,8 @@ assume invariants the kernel maintains, not inputs, and are not yet audited as s
 
 ### 3.10. Timing and side channels
 
-Single core, no SMP: no cross-core channels yet. Speculative-execution attacks other than
-Meltdown (§3.4) are not modelled.
+Single core, no SMP: no cross-core channels yet. Meltdown is mitigated by KPTI (§3.4); other
+speculative-execution attacks (Spectre, L1TF, MDS) are not modelled.
 
 ## 4. Rules for new code
 
