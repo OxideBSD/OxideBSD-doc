@@ -1,6 +1,7 @@
 # OxideBSD 128 MB RAM floor: design specification
 
-Status: **draft** (2026-10-12), under review. Target release: v0.3.0 (`ROADMAP.md`, item 6).
+Status: **piece A implemented** (2026-10-13, OxideBSD `c6b3691`..`f7bf9c9`; per-step commits in §3.8);
+pieces B and C specified in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
