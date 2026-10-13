@@ -47,7 +47,9 @@ registered. oxfs intercepts no device names; it registers the devices it impleme
 
 3.5. Device numbers are kept as they are (Linux's where one exists): `null` (1, 3), `zero`
 (1, 5), `random` (1, 8), `urandom` (1, 9), `ttyv<n>` (4, n), `tty` (5, 0), `console` (5, 1),
-`klog` (7, 0), `fb0` (29, 0).
+`klog` (7, 0), `fb0` (29, 0); the data disk and its partitions, `ide0` (3, 0) and
+`ide0p<N>`/`ide0s<N>` (3, N), `virt0` (252, 0) and `virt0p<N>`/`virt0s<N>` (252, N)
+(`RAM_FLOOR.md` §3.4.5).
 
 ## 4. devfs
 

@@ -181,9 +181,14 @@ image files.
 - Disk names are OxideBSD's own, by bus: `nvme0`, `sata0`, `virt0` (virtio-blk), `sda0` (SCSI
   and USB mass storage), `mmc0`, `ide0`.
 - Disks are partitioned. GPT partitions are `<disk>p<N>` (`virt0p1`), MBR partitions
-  `<disk>s<N>` (`ide0s1`; the four primary entries, no extended/logical yet). oxfs gets its own
-  GPT partition type GUID (generated once, recorded here) and an MBR type byte. oxfs lives in a
-  partition, never on a whole disk.
+  `<disk>s<N>` (`ide0s1`; the four primary entries, no extended/logical yet). oxfs's GPT
+  partition type GUID is `06026785-76ab-42c2-afe2-66ea3af562b8` (generated 2026-10-13); its MBR
+  type byte is `0xA2` (chosen as absent from the common type lists; to be checked against
+  others before an installer writes MBR disks). oxfs lives in a partition, never on a whole disk;
+  the memory disk (`md`) is the exception, holding oxfs whole.
+- Raw devices are character devices, `root:root 0600` (the BSDs' `operator` group doesn't exist
+  yet), read-only until read-only mounts exist (§3.4.3): writing under a mounted file system
+  would go around its cache.
 - A blank disk is partitioned and formatted (a GPT with one oxfs partition) **only** when the
   kernel is booted with an explicit flag (`format-blank`), which the QEMU runner passes for test
   and dev disks. Real hardware is never partitioned by the kernel on its own.
