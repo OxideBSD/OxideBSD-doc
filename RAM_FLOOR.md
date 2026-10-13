@@ -197,9 +197,15 @@ image files.
   `mount -a`.
 - The kernel finds the root filesystem from **`/boot/fsconf`**, a versioned binary form of
   `/etc/fstab` produced by `fsconf_mkdb(8)` (run explicitly after editing fstab, like
-  `pwd_mkdb`). Limine loads it beside the kernel as a boot module, so it's readable before any
-  filesystem is mounted; the boot partition carries the copy. Without it (or with no matching
-  disk) the root is the RAM disk (§3.1.3.1). Its format gets its own short specification.
+  `pwd_mkdb`; format in `fsconf(5)`). Limine loads it beside the kernel as a boot module, so it's
+  readable before any filesystem is mounted; the boot partition carries the copy (the QEMU
+  runner builds it from `etc/fstab` with a host build of the same tool). Without it, or when the
+  device it names isn't on the disk, the root is the disk's first oxfs partition (logged).
+- The root line names the partition by **GPT label**, `/dev/gpt/rootfs` (FreeBSD's
+  `/dev/gpt/<label>`), not by disk: dev runs use virtio (`virt0`) and tests IDE (`ide0`), and a
+  label survives both. `format-blank` labels its partition `rootfs`; devfs adds
+  `/dev/gpt/<label>` for every labelled GPT partition (major 253). (Decided while the user was
+  away, 2026-10-13: open to change.)
 
 3.4.4. The superblock layout changes (size, clean flag): `SUPERBLOCK_VERSION` MUST be bumped.
 Existing disks are reformatted.

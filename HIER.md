@@ -30,7 +30,7 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 
 | Source | Programs |
 |--------|----------|
-| Native (`sbin/`, 12) | `dmesg`, `emergency`, `init`, `init_sh`, `lsoxmod`, `mount`, `nologin`, `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount` |
+| Native (`sbin/`, 13) | `dmesg`, `emergency`, `init`, `init_sh`, `lsoxmod`, `mount`, `nologin`, `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount`, `update` |
 | Links (4) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `lsmod` -> `lsoxmod` |
 | BusyBox (2) | `mknod`, `ping` |
 
@@ -54,7 +54,7 @@ Clang's resource directory is `/usr/lib/clang/23`.
 
 | Source | Programs |
 |--------|----------|
-| Native (`usr.sbin/`, 8) | `certctl`, `cron`, `makewhatis`, `newsyslog`, `periodic` (a shell script), `pwd_mkdb`, `syslogd`, `tzsetup` |
+| Native (`usr.sbin/`, 9) | `certctl`, `cron`, `fsconf_mkdb`, `makewhatis`, `newsyslog`, `periodic` (a shell script), `pwd_mkdb`, `syslogd`, `tzsetup` |
 | Vendored and forks (2) | `zic` (`external/public-domain/tz`), `visudo` (`external/mit/sudo-rs`) |
 | BusyBox (2) | `chroot`, `ntpd` |
 
