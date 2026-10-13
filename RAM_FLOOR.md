@@ -1,7 +1,7 @@
 # OxideBSD 128 MB RAM floor: design specification
 
 Status: **piece A implemented** (2026-10-13, OxideBSD `c6b3691`..`f7bf9c9`; per-step commits in §3.8);
-pieces B and C specified in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
+piece B specified (§4); piece C in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -192,7 +192,8 @@ image files.
   would go around its cache.
 - A blank disk is partitioned and formatted (a GPT with one oxfs partition) **only** when the
   kernel is booted with an explicit flag (`format-blank`), which the QEMU runner passes for test
-  and dev disks. Real hardware is never partitioned by the kernel on its own.
+  and dev disks. Real hardware is never partitioned by the kernel on its own. **Superseded by
+  piece B** (§4.2.1): the kernel stops formatting altogether and `format-blank` is removed.
 - **`/etc/fstab`**, BSD format (device, mount point, type, options, dump, pass). `/etc/rc` runs
   `fsck -p` (a front end dispatching to `fsck_oxfs` by type) for every pass > 0 entry, then
   `mount -a`.
@@ -263,30 +264,180 @@ inode number and the mount table are unchanged: they sit above `read_block`/`wri
 10. Read-only mounts, the read-only root at boot, `mount -u` to read-write (§3.4.3).
 11. `fsck_oxfs`, the `fsck(8)` front end and its `/etc/rc` step.
 
-## 4. Piece B: the host image builder (outline)
+## 4. Piece B: the host image builder
 
-Decided 2026-10-12; a full specification follows piece A.
+Decided 2026-10-12, specified 2026-10-13. Piece B takes every seed file out of the kernel: the
+system is built on the host into dist sets and filesystem images, the way FreeBSD's `makefs(8)`
+and `mkimg(1)` build release images. The in-place dev disk upgrade (§4.7) needs a VFS and lands
+after it (§4.8).
 
-- oxfs's on-disk format (superblock, `pack_inode`/`unpack_inode`, directory records, bitmap
-  layout) moves into a `no_std`, `alloc`-free crate shared by the module and a host tool,
-  `makefs-oxfs` (FreeBSD `makefs(8)`), so the two can't drift.
-- `build.rs` stages each set's tree plus a manifest (mode, owner, symlinks) and `makefs-oxfs`
-  writes the image. The ~400 `seed_*` calls in oxfs's `module_init` and every `include_bytes!` of
-  a seed file go away, and the kernel shrinks to its code, its modules and the embedded init.
-- **Dist sets**: `base`, `clang`, `tests` (the POSIX corpus and regress fixtures). A 128 MB install
-  takes `base`; dev and test images take all three.
-- **Dev disk**: rebuilding updates the persistent dev disk in place (an overlay/upgrade, in the
-  spirit of `freebsd-update`), replacing base-system files and keeping local changes such as
-  `/home` and edited `/etc` files. Each set's manifest records a hash per file, and the installed
-  manifest is kept on the disk; a file whose current hash differs from the installed manifest's
-  was changed locally and is kept (a changed `/etc` file gets a three-way merge or a `.new`
-  beside it, as `etcupdate` does). Tests always start from a fresh image.
+### 4.1. liboxfs: the shared on-disk format
+
+4.1.1. oxfs's on-disk format moves into `lib/liboxfs` (FreeBSD's `libufs`), a `no_std`,
+`alloc`-free crate: the superblock and `SUPERBLOCK_VERSION`, `pack_inode`/`unpack_inode`,
+directory records, the bitmap layout and its free-count array, the block layout constants
+(`DATA_BLOCK_OFFSET`, the inode file), and the oxfs GPT type GUID and MBR type byte. It reads
+and writes through a caller-supplied block device trait (`read_block`/`write_block` by number),
+so the same code runs over the kernel's cache, a raw device on target and an image file on the
+host.
+
+4.1.2. The oxfs module, `fsck_oxfs` and every host tool below MUST use liboxfs for the format;
+none keeps its own copy of a layout constant or a pack routine. A layout change is one edit and
+one `SUPERBLOCK_VERSION` bump.
+
+### 4.2. Tools
+
+| Tool | Runs on | Does |
+|---|---|---|
+| `newfs_oxfs(8)` | target (`/sbin`, static) and host | writes an empty oxfs (superblock, bitmap, inode file, root, `lost+found`) to a partition or image file |
+| `makefs-oxfs` | host | writes an oxfs partition image from a staged tree and an mtree specification (§4.3) |
+| `mkimg-oxfs` | host | assembles partition images into a GPT (or MBR) disk image; GPT labels and type GUIDs per partition |
+| `fsck_oxfs(8)` | target and host | §3.4; on the host it checks image files, and `makefs-oxfs`'s output is checked by it at build time |
+
+4.2.1. **The kernel never formats a filesystem.** `format_fresh_filesystem`, every `seed_*`
+routine and the `format-blank` boot flag are removed (§3.4.5 is amended accordingly). A disk with
+no oxfs partition, or an unformatted one, is not mounted; the kernel says so and boot fails
+(§4.6.3). Formatting is `newfs_oxfs`'s job, partitioning a future `gpart`-like tool's.
+
+4.2.2. The memory disk (`md`, §3.1.3.1) stays as a device but is no longer formatted by the
+kernel: piece C fills it from the mfsroot image. Until then a boot with no disk has no root
+filesystem.
+
+### 4.3. Sets and their manifests
+
+4.3.1. `build.rs` stages each **dist set** as a directory tree under `target/sets/<set>/` plus an
+**mtree(5) specification** `target/sets/<set>.mtree`, the format NetBSD's and FreeBSD's `makefs`
+consume. Every entry carries `type`, `mode`, `uname`/`gname` and `uid`/`gid`; files carry
+`size` and `sha256`; symlinks carry `link`. Hard links are staged as host hard links and
+`makefs-oxfs` keeps them as one inode (`makefs` does the same by device and inode number).
+
+4.3.2. Sets:
+
+- `base`: everything a console install needs (§1), including `/etc`, man pages, zoneinfo,
+  OpenSSL and its certificates, ncurses and terminfo, nano, vi, doom, bmake, ninja.
+- `clang`: Clang/LLVM, lld, compiler-rt, the musl and libc++ headers and libraries.
+- `tests`: the POSIX corpus and `/usr/tests` (the regress fixtures oxfs seeds today).
+
+A file belongs to exactly one set; `build.rs` MUST fail the build on an overlap or on a seeded
+file that no set claims.
+
+4.3.3. Timestamps in the mtree (`time=`) are a fixed build epoch, the time of the source tree's
+`HEAD` commit, so an unchanged set produces a byte-identical image and archive (reproducible
+builds; `SOURCE_DATE_EPOCH`'s rule). (Decided by Claude while writing this; open to change.)
+
+4.3.4. **Set archives.** Each set is also written as `target/sets/<set>.tar.zst`: a `ustar`
+archive of the staged tree, its mtree included as `./etc/mtree/<set>.mtree` (`base` only carries
+`/etc/mtree` itself, so the specs of all installed sets live there), compressed with zstd. These
+are the distribution format the installer and network installs will use. The target gets a
+static `zstd` decompressor in `/sbin` (upstream zstd, vendored at `external/bsd/zstd`, BSD
+licence; FreeBSD ships the same in base) so a set can be unpacked by a static `/sbin`
+program before `/usr` exists. Unpacking itself is the installer's milestone.
+
+### 4.4. Images
+
+4.4.1. `makefs-oxfs -s <size> -F <set>.mtree ... <out.img> <set dirs>` writes one oxfs partition
+image from one or more sets (later sets' entries may not overwrite earlier ones, §4.3.2). It sets
+the clean flag. Default image size: 1 GiB (`OXIDEBSD_DISK_MIB` overrides), as today's disks.
+
+4.4.2. `mkimg-oxfs -s gpt -p oxfs/rootfs:=<part.img> -o <disk.img>` (mkimg(1)'s syntax) writes a
+GPT disk with one `rootfs`-labelled oxfs partition, the layout `format-blank` produces today.
+
+4.4.3. The installed sets' specifications are on the image in `/etc/mtree`, so `oxupdate` (§4.7)
+and a future `mtree -c` check can compare the disk against them.
+
+### 4.5. The QEMU runner
+
+4.5.1. `build.rs` builds two images when their inputs change: `target/images/test.img` (base,
+clang, tests) and the dev image (the same three sets). A build with unchanged sets doesn't
+rewrite them.
+
+4.5.2. **Tests** copy `test.img` to a fresh disk per run (`cp --reflink=auto`, falling back to a
+sparse copy), so no test sees another's writes, as now.
+
+4.5.3. **The dev disk** (`target/oxfs_disk.img`) until `oxupdate` exists: the runner records the
+sets' hashes beside it (`target/oxfs_disk.sets`). When a set changed, the disk is replaced by a
+fresh copy of the new dev image, with a loud message that local changes on it are gone (what a
+reformat does today). `OXIDEBSD_KEEP_DISK=1` keeps the old disk. `OXIDEBSD_DISK_IMAGE` disks
+are created from the dev image when missing and never replaced.
+
+4.5.4. The runner keeps passing `/boot/fsconf` (§3.4.5); it no longer passes `format-blank`.
+
+### 4.6. The kernel
+
+4.6.1. Every `include_bytes!` of a seed file and the generated seed manifests
+(`*_MANIFEST_PATH`) leave the oxfs module; the module keeps only filesystem code. Test kernels
+still embed their own regress ELFs (`tests/*.rs`): those are test fixtures spawned by the test,
+not seed files.
+
+4.6.2. **Nothing userland is embedded in the kernel**: `/sbin/init`, `/bin/sh`,
+`/sbin/emergency` and `sys/kern/start_init` are removed from the kernel image. This reverses
+INIT.md §9.6 (embedded so a damaged filesystem can't stop init), which MUST be amended: rescue
+from a damaged root becomes piece C's mfsroot.
+
+4.6.3. pid 1 is started from the root filesystem, as on the BSDs (FreeBSD's `start_init`): the
+kernel creates process 1 and has it `execve` the first path that exists in `init_path`
+(`/sbin/init:/sbin/oinit` by default, `init=`/`init_path=` override, colon-separated). The
+kernel's `execve` therefore gains a kernel-initiated entry, a path executed in a fresh process
+with no caller image to preserve. If no path can be executed, or no root filesystem is mounted,
+the kernel prints why and panics (`no init found`). The repeated-failure program (§9.4) is
+`/sbin/emergency` read from the root filesystem at the time it's needed.
+
+4.6.4. Expected size: the kernel image loses the 293 MiB of `.rodata` and the second copy made
+by `module::load` (§1). Measured result recorded here when B lands.
+
+### 4.7. oxupdate: the dev disk upgraded in place (after the VFS)
+
+4.7.1. `oxupdate(8)` installs a newer set over the running system: the runner attaches the new
+set's oxfs image as a second, read-only disk; `oxupdate` mounts it (this needs a second mounted
+filesystem: the VFS, §4.8) and, for every file in the new set's mtree:
+
+- not on the disk, or matching the **installed** mtree's `sha256`: replaced;
+- changed locally (hash differs from the installed mtree's): kept; under `/etc`, the new file
+  is merged three-way against the old installed version, or written beside it as `<name>.new`
+  when the merge conflicts (`etcupdate`'s behaviour);
+- in the installed mtree but not the new one: removed, unless changed locally.
+
+Then the new mtree replaces `/etc/mtree/<set>.mtree`. It runs at boot from an rc.d script when
+the second disk is present. Tests never use it: they always start fresh (§4.5.2).
+
+### 4.8. Dependency on a VFS
+
+Mounting a second oxfs means per-instance filesystem state: the device, superblock, bitmap,
+inode file and cache all live as module globals today. The user chose (2026-10-13) to build a
+**real VFS layer** (vnodes, filesystem types with instances; oxfs, tmpfs, devfs and procfs as
+separate types) instead of multi-instance oxfs. It gets its own specification (`VFS.md`, not yet
+written) after piece B lands. `oxupdate` (§4.7) and piece C's handover from mfsroot to the disk
+root both wait on it.
+
+### 4.9. Verification
+
+- Every existing test passes booting from `test.img`, and the canary matches its baseline.
+- `fsck_oxfs` (host build) passes on every image `makefs-oxfs` writes, at build time.
+- Building twice from the same commit gives byte-identical images and archives (§4.3.3).
+- The kernel image size and `/proc/meminfo` at the login prompt are recorded (§4.6.4).
+- **The floor**: with the disk image, `OXIDEBSD_QEMU_MEM=128` boots to a login prompt. Piece B
+  is where this first becomes possible (piece C isn't needed for a disk boot); a test boots to
+  login at 128 MB and stays in the suite.
+
+### 4.10. Commits
+
+1. `lib/liboxfs`: the format moved out of the module; module uses it; no behaviour change.
+2. `newfs_oxfs` (target and host) and the host `fsck_oxfs` build.
+3. `makefs-oxfs` and `mkimg-oxfs`.
+4. Sets staged with mtree specs by `build.rs`; images built and checked; still unused.
+5. The switch: the runner boots from the images (§4.5); seeding, `format_fresh_filesystem` and
+   `format-blank` removed from the kernel.
+6. pid 1 from the root filesystem (§4.6.3); `init`, `sh`, `emergency` and `start_init` no longer
+   embedded; INIT.md amended.
+7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`.
+8. The 128 MB boot-to-login test (§4.9).
 
 ## 5. Piece C: mfsroot (outline)
 
 - Limine loads a small oxfs image as a boot module (a new Limine `ModuleRequest`); the kernel
   exposes it as a memory disk (`md(4)`) that oxfs mounts as root when there is no disk, with
-  `-s`, or when asked on the command line.
+  `-s`, or when asked on the command line. Mounting the disk root from it and switching over
+  (`reboot -r`-style) needs the VFS (§4.8).
 - Contents: static `/bin` and `/sbin`, `fsck_oxfs`, and later the installer. Size target: a few
   MiB, leaving the 128 MB machine its memory once the real root is mounted (or the mfsroot
   freed).
@@ -299,3 +450,10 @@ shared format crate, sets `base`/`clang`/`tests`, the dev disk upgraded in place
 changes detected by manifest hash (§4); the bitmap paged through the cache, a RAM disk when there
 is no disk, own disk names, GPT and MBR partitions, `/etc/fstab` compiled to `/boot/fsconf` for
 root selection, kernel partitioning only under `format-blank` (§3.4.5).
+
+2026-10-13: liboxfs at `lib/liboxfs`; mtree(5) set specifications; the kernel never formats
+(`newfs_oxfs` instead, `format-blank` removed); `makefs-oxfs` writes partition images and
+`mkimg-oxfs` wraps them; `md` kept, unformatted until piece C; nothing userland embedded in the
+kernel, pid 1 exec'd from the root filesystem; set archives zstd-compressed; `oxupdate` runs on
+target at boot from a set image on a second disk, which needs a real VFS, built after piece B;
+until then the dev disk is replaced when a set changes (§4).
