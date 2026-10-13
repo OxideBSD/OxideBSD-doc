@@ -169,5 +169,5 @@ an `SHM_RDONLY` attachment can't be made writable; W|X only for a `wxneeded` pro
 ## 6. Open questions
 
 1. Fuzzing: a syzkaller-style system call fuzzer, and a packet fuzzer for the network stack.
-2. Order of the remaining hardware protections: KPTI next (NX and W^X landed 2026-10-11).
+2. Order of the remaining hardware protections (NX and W^X landed 2026-10-11, KPTI 2026-10-12).
 3. Whether KASLR is worth it before every executable is a PIE.
