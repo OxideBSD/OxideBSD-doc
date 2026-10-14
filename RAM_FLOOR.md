@@ -410,7 +410,7 @@ from a damaged root becomes piece C's mfsroot.
 
 4.6.3. pid 1 is started from the root filesystem, as on the BSDs (FreeBSD's `start_init`): the
 kernel creates process 1 and has it `execve` the first path that exists in `init_path`
-(`/sbin/init:/sbin/oinit` by default, `init=`/`init_path=` override, colon-separated). The
+(`/sbin/init` by default, `init=`/`init_path=` override, colon-separated). The
 kernel's `execve` therefore gains a kernel-initiated entry, a path executed in a fresh process
 with no caller image to preserve. If no path can be executed, or no root filesystem is mounted,
 the kernel prints why and panics (`no init found`). The repeated-failure program (§9.4) is
@@ -474,7 +474,8 @@ root both wait on it.
 5b. `makefs -t msdos`, the EFI system partition and BIOS boot in `mkimg`; the disk-boot test
    (§4.4.4).
 6. pid 1 from the root filesystem (§4.6.3); `init`, `sh`, `emergency` and `start_init` no longer
-   embedded; INIT.md amended.
+   embedded; INIT.md amended. Landed: the boot kernel image went from 6.0 MB to 3.5 MB (debug
+   sections stripped), its read-only data from 3.8 MB to 1.25 MB.
 7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`.
 8. The 128 MB boot-to-login test (§4.9).
 

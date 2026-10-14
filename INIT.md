@@ -70,13 +70,12 @@ keeps answering the signals of §6.
 be passed to init as arguments: `-s` requests the `single-user` state.
 
 4.1.1. `init=<path>` (Linux's) and `init_path=<path>[:<path>...]` (FreeBSD's) on the kernel
-command line name other programs to start instead, tried in that order (`init=` first). The
-kernel can only start a process from an image in memory, so it then runs its embedded
-`start_init` as process 1, which executes each path in turn, keeping the process ID, with the boot
-flags; on a restart after a death (§9.2) `-R` is passed to `/sbin/init` only. If none can be run,
-`/bin/sh` is tried on the console, and if that fails `start_init` exits, so the supervision of
-§9 restarts it and finally runs the emergency program. Without either option the embedded
-`/sbin/init` is started directly, as §9.6 requires.
+command line name other programs to start instead, tried in that order (`init=` first). The kernel
+reads each from the root file system in turn and starts the first that loads as process 1, with
+the boot flags; on a restart after a death (§9.2) `-R` is passed to `/sbin/init` only, and
+programs other than `/sbin/init` get the kernel's default environment. If none can be started,
+`/bin/sh` is tried on the console; if that fails too, the kernel stops ("no init found") at boot,
+or after a death leaves the system idle.
 
 4.2. Init MUST NOT depend on inherited environment variables. It MUST construct the environment
 for its children explicitly, including at least `PATH`, `HOME`, `SHELL` and `TERM`. The default
@@ -210,8 +209,10 @@ recorded deaths are cleared.
 9.5. The repair shell requires root's password when the console is `insecure` (§5.4), unless root
 has no password or none can be read.
 
-9.6. The kernel runs init and the emergency program from images embedded in the kernel, so that a
-damaged file system cannot prevent either from starting.
+9.6. The kernel reads init and the emergency program from the root file system when it starts
+them (amended 2026-10-13, RAM_FLOOR.md §4.6.3: they were embedded in the kernel so that a damaged
+file system could not prevent either from starting). Recovering a root file system too damaged to
+run them is the mfsroot's job (RAM_FLOOR.md §5).
 
 **Rationale.** A crash in init should not end a running system when the rest of it is healthy.
 Respawning preserves running work; the repeated-failure limit prevents a crash loop from consuming
@@ -236,7 +237,7 @@ The design depends on the following kernel behavior:
 |---|---|---|
 | `kill(-1, sig)` signals every process except process 1 and the caller | 10.3 | Done (f97971a) |
 | Boot flags passed to init as arguments | 4.1 | Done (27dbcb1): `-s` on the kernel command line gives `/sbin/init -s` |
-| `init=` and `init_path=` | 4.1.1 | Done (946dfa0): `sys/kern/start_init` |
+| `init=` and `init_path=` | 4.1.1 | Done (946dfa0); since RAM_FLOOR B6 the kernel reads the programs from disk (`process::init`) |
 | Signal protection for process 1 | 9.1 | Done (b212178) |
 | Respawn, reparenting and repeated-failure program | 9.2–9.6 | Done (b212178); `debug.kill_init` (`SYSCTL.md` §5, 3295c7c) kills init to test it |
 | `sethostname(2)` (`rc.d/hostname`) | 12 | Done (b212178): `SYS_SETHOSTNAME` = 576 |
