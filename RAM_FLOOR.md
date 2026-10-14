@@ -467,7 +467,9 @@ root both wait on it.
    seeding put `/usr/lib/libunwind.a` in twice (two records of one name), and neither the
    writer nor `fsck_oxfs` caught duplicate names; both do now.
 5. The switch: the runner boots from the images (§4.5); seeding, `format_fresh_filesystem` and
-   `format-blank` removed from the kernel.
+   `format-blank` removed from the kernel. Landed: the oxfs module object went from 299 MB to 1.1 MB and
+   the (debug) kernel image from 333 MB to 35 MB. The format self-check went with the seeding
+   (its fixtures are in the tests set), and with it the module's kernel-segment copy path.
 5b. `makefs -t msdos`, the EFI system partition and BIOS boot in `mkimg`; the disk-boot test
    (§4.4.4).
 6. pid 1 from the root filesystem (§4.6.3); `init`, `sh`, `emergency` and `start_init` no longer
