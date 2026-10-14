@@ -86,5 +86,6 @@ holding 33 files in 29,787 pages, with 3.76 million hits to 29,791 misses.
 
 ## 6. Open questions
 
-1. Filling entries lazily on page faults (demand paging) instead of when mapping.
+1. Filling entries lazily on page faults (demand paging) instead of when mapping: specified in
+   `DEMANDPAGE.md` (2026-10-14).
 2. Sharing writable pages until first write (copy-on-write), for data segments and `fork`.
