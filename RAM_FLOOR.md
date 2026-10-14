@@ -290,9 +290,9 @@ one `SUPERBLOCK_VERSION` bump.
 | Tool | Runs on | Does |
 |---|---|---|
 | `newfs_oxfs(8)` | target (`/sbin`, static) and host | writes an empty oxfs (superblock, bitmap, inode file, root, `lost+found`) to a partition or image file |
-| `makefs-oxfs` | host | writes an oxfs partition image from a staged tree and an mtree specification (§4.3) |
-| `mkimg-oxfs` | host | assembles partition images into a GPT (or MBR) disk image; GPT labels and type GUIDs per partition |
-| `fsck_oxfs(8)` | target and host | §3.4; on the host it checks image files, and `makefs-oxfs`'s output is checked by it at build time |
+| `makefs(8)` | host and target (`/usr/sbin`) | writes a filesystem image from a staged tree and an mtree specification (§4.3): `-t oxfs`, later `-t msdos` (§4.4.4) |
+| `mkimg(1)` | host and target (`/usr/bin`) | assembles partition images into a GPT (or MBR) disk image; GPT labels and type GUIDs per partition; later boot code (§4.4.4) |
+| `fsck_oxfs(8)` | target and host | §3.4; on the host it checks image files, and `makefs -t oxfs`'s output is checked by it at build time |
 
 4.2.1. **The kernel never formats a filesystem.** `format_fresh_filesystem`, every `seed_*`
 routine and the `format-blank` boot flag are removed (§3.4.5 is amended accordingly). A disk with
@@ -308,13 +308,19 @@ filesystem.
 (`sys/drivers/disk.rs`), so `newfs_oxfs` sizes a partition without being told. (Decided
 2026-10-13, as were `-L` with a 32-byte label in the superblock and `-i` preallocating inodes.)
 
+4.2.4. `makefs` and `mkimg` take FreeBSD's names, paths and option shapes (`usr.sbin/makefs`,
+`usr.bin/mkimg`), with the filesystem chosen by `-t`; they are built for the host (image
+building) and installed on the target, so OxideBSD can build its own images once it hosts
+itself. mtree(5) specifications are read and written by `lib/libmtree`, shared with `build.rs`
+and, later, `oxupdate` and an `mtree(8)`. (Decided 2026-10-13.)
+
 ### 4.3. Sets and their manifests
 
 4.3.1. `build.rs` stages each **dist set** as a directory tree under `target/sets/<set>/` plus an
 **mtree(5) specification** `target/sets/<set>.mtree`, the format NetBSD's and FreeBSD's `makefs`
 consume. Every entry carries `type`, `mode`, `uname`/`gname` and `uid`/`gid`; files carry
 `size` and `sha256`; symlinks carry `link`. Hard links are staged as host hard links and
-`makefs-oxfs` keeps them as one inode (`makefs` does the same by device and inode number).
+`makefs -t oxfs` keeps them as one inode (`makefs` does the same by device and inode number).
 
 4.3.2. Sets:
 
@@ -340,15 +346,23 @@ program before `/usr` exists. Unpacking itself is the installer's milestone.
 
 ### 4.4. Images
 
-4.4.1. `makefs-oxfs -s <size> -F <set>.mtree ... <out.img> <set dirs>` writes one oxfs partition
+4.4.1. `makefs -t oxfs -s <size> -F <set>.mtree ... <out.img> <set dirs>` writes one oxfs partition
 image from one or more sets (later sets' entries may not overwrite earlier ones, §4.3.2). It sets
 the clean flag. Default image size: 1 GiB (`OXIDEBSD_DISK_MIB` overrides), as today's disks.
 
-4.4.2. `mkimg-oxfs -s gpt -p oxfs/rootfs:=<part.img> -o <disk.img>` (mkimg(1)'s syntax) writes a
+4.4.2. `mkimg -s gpt -p oxfs/rootfs:=<part.img> -o <disk.img>` (mkimg(1)'s syntax) writes a
 GPT disk with one `rootfs`-labelled oxfs partition, the layout `format-blank` produces today.
 
 4.4.3. The installed sets' specifications are on the image in `/etc/mtree`, so `oxupdate` (§4.7)
 and a future `mtree -c` check can compare the disk against them.
+
+4.4.4. **A bootable disk image** (decided 2026-10-13, lands after commit 5, once the kernel is
+small): `mkimg` also writes an EFI system partition, a FAT filesystem made by
+`makefs -t msdos` (a from-scratch FAT32 writer) holding Limine, `limine.conf` and the kernel,
+and BIOS boot: Limine's MBR code and stage 2 in a BIOS boot partition, installed by `mkimg -b`
+itself (FreeBSD mkimg's bootcode option), doing what `limine bios-install` does, so it works on
+the target too. The QEMU runner keeps booting the ISO with the image as its data disk; a test
+boots the disk image alone, on BIOS and on UEFI.
 
 ### 4.5. The QEMU runner
 
@@ -417,7 +431,7 @@ root both wait on it.
 ### 4.9. Verification
 
 - Every existing test passes booting from `test.img`, and the canary matches its baseline.
-- `fsck_oxfs` (host build) passes on every image `makefs-oxfs` writes, at build time.
+- `fsck_oxfs` (host build) passes on every image `makefs -t oxfs` writes, at build time.
 - Building twice from the same commit gives byte-identical images and archives (§4.3.3).
 - The kernel image size and `/proc/meminfo` at the login prompt are recorded (§4.6.4).
 - **The floor**: with the disk image, `OXIDEBSD_QEMU_MEM=128` boots to a login prompt. Piece B
@@ -431,10 +445,12 @@ root both wait on it.
    `BlockDevice`), `-N`/`-L`/`-i`/`-s`, a volume label in the superblock (`SUPERBLOCK_VERSION`
    7), and `DIOCGMEDIASIZE`/`DIOCGSECTORSIZE` on raw disk devices (§4.2.3). The host builds of
    both tools land with their first use, in commit 4.
-3. `makefs-oxfs` and `mkimg-oxfs`.
+3. `lib/libmtree`, `makefs -t oxfs` and `mkimg` (a GPT data disk), for the host and the target.
 4. Sets staged with mtree specs by `build.rs`; images built and checked; still unused.
 5. The switch: the runner boots from the images (§4.5); seeding, `format_fresh_filesystem` and
    `format-blank` removed from the kernel.
+5b. `makefs -t msdos`, the EFI system partition and BIOS boot in `mkimg`; the disk-boot test
+   (§4.4.4).
 6. pid 1 from the root filesystem (§4.6.3); `init`, `sh`, `emergency` and `start_init` no longer
    embedded; INIT.md amended.
 7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`.
@@ -460,8 +476,8 @@ is no disk, own disk names, GPT and MBR partitions, `/etc/fstab` compiled to `/b
 root selection, kernel partitioning only under `format-blank` (§3.4.5).
 
 2026-10-13: liboxfs at `lib/liboxfs`; mtree(5) set specifications; the kernel never formats
-(`newfs_oxfs` instead, `format-blank` removed); `makefs-oxfs` writes partition images and
-`mkimg-oxfs` wraps them; `md` kept, unformatted until piece C; nothing userland embedded in the
+(`newfs_oxfs` instead, `format-blank` removed); `makefs -t oxfs` writes partition images and
+`mkimg` wraps them; `md` kept, unformatted until piece C; nothing userland embedded in the
 kernel, pid 1 exec'd from the root filesystem; set archives zstd-compressed; `oxupdate` runs on
 target at boot from a set image on a second disk, which needs a real VFS, built after piece B;
 until then the dev disk is replaced when a set changes (§4).
