@@ -70,7 +70,8 @@ each bitmap block's free count, so allocation skips full regions without reading
 `RAM / 4`), which oxfs formats and uses exactly as a disk, through the same cache. Piece C's
 mfsroot reuses it.
 
-3.1.4. tmpfs keeps a fixed in-memory pool, sized `clamp(RAM / 16, 8 MiB, 64 MiB)` at boot. Its
+3.1.4. tmpfs's blocks are pages taken from the kernel on demand (amended 2026-10-13: it was a
+fixed pool reserved at boot), up to a limit of `clamp(RAM / 16, 8 MiB, 64 MiB)`. Its
 blocks never pass through the cache. tmpfs block numbers start at a fixed base above any disk
 block number (`TMPFS_BLOCK_BASE`, like `TMPFS_INODE_BASE`) instead of at `NUM_BLOCKS`.
 
@@ -476,6 +477,10 @@ root both wait on it.
    embedded; INIT.md amended.
 7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`.
 8. The 128 MB boot-to-login test (§4.9).
+
+Measured 2026-10-13 after commit 5 (and a debug-stripped boot kernel, tmpfs on demand): the
+system boots to login in 128 MB under UEFI (OVMF and Limine fail below ~128 MB before the kernel
+runs) and in 48 MB under BIOS; at 32 MB `/etc/rc` runs out of memory at syslogd's libcrypto.
 
 ## 5. Piece C: mfsroot (outline)
 
