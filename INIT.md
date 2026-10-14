@@ -59,6 +59,11 @@ running, so leaving it returns to `multi-user` without running `/etc/rc` again, 
 them twice. FreeBSD instead stops everything first; OxideBSD keeps them so that maintenance on the
 console does not interrupt services.
 
+If the `single-user` shell cannot be run at all, its child MUST report why and wait 30 seconds
+before exiting (FreeBSD's `STALL_TIMEOUT`), so that a root filesystem without `/bin/sh` and
+`/etc/rc` does not spin init between `runcom` and `single-user`. init itself does not wait, and
+keeps answering the signals of §6.
+
 ## 4. Boot
 
 4.1. The kernel MUST start `/sbin/init` as process 1. Boot flags from the kernel command line MUST
