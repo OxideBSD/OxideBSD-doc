@@ -477,7 +477,8 @@ root both wait on it.
    embedded; INIT.md amended. Landed: the boot kernel image went from 6.0 MB to 3.5 MB (debug
    sections stripped), its read-only data from 3.8 MB to 1.25 MB.
 7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`.
-8. The 128 MB boot-to-login test (§4.9).
+8. The 128 MB boot-to-login test (§4.9). Landed: `tests/ram_floor_boot.rs` (the real kernel; the
+   runner passes it at `login:` and fails it at a panic or any out-of-memory, 128 MB by default).
 
 Measured 2026-10-13 after commit 5 (and a debug-stripped boot kernel, tmpfs on demand): the
 system boots to login in 128 MB under UEFI (OVMF and Limine fail below ~128 MB before the kernel
