@@ -482,6 +482,8 @@ root both wait on it.
 Measured 2026-10-13 after commit 5 (and a debug-stripped boot kernel, tmpfs on demand): the
 system boots to login in 128 MB under UEFI (OVMF and Limine fail below ~128 MB before the kernel
 runs) and in 48 MB under BIOS; at 32 MB `/etc/rc` runs out of memory at syslogd's libcrypto.
+After commit 6: 32 MB under BIOS boots cleanly to login (48 MB leaves 41 MB usable, 27.5 MB
+free at a root shell); at 28 MB syslogd can't fork.
 
 ## 5. Piece C: mfsroot (outline)
 
