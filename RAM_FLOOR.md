@@ -316,11 +316,25 @@ and, later, `oxupdate` and an `mtree(8)`. (Decided 2026-10-13.)
 
 ### 4.3. Sets and their manifests
 
-4.3.1. `build.rs` stages each **dist set** as a directory tree under `target/sets/<set>/` plus an
-**mtree(5) specification** `target/sets/<set>.mtree`, the format NetBSD's and FreeBSD's `makefs`
-consume. Every entry carries `type`, `mode`, `uname`/`gname` and `uid`/`gid`; files carry
-`size` and `sha256`; symlinks carry `link`. Hard links are staged as host hard links and
-`makefs -t oxfs` keeps them as one inode (`makefs` does the same by device and inode number).
+4.3.1. **The install list**, `distrib/install.mtree`, says what is installed into the system's
+file tree: mtree(5) syntax (read by `lib/libmtree`), each entry with its type, mode and owner,
+plus where it comes from: `src=artifact:NAME` (a build product, by the name build.rs gives
+it), `src=gen:NAME` (a list build.rs generates: zoneinfo, OpenSSL, the POSIX corpus...),
+or a path in the source tree; `type=tree` installs a generated list under a directory and
+`hardlink=` gives an entry another name. A file's mode defaults to 0755 for an ELF executable
+or shared object and a `#!` script, 0644 otherwise. A path installed twice fails the build.
+
+**The set lists**, `distrib/sets/lists/{base,clang,tests}` (NetBSD's `distrib/sets/lists`),
+assign each installed path to a set by pattern (`*` within a component, `**` across
+components); the most specific match wins (an exact path, then the longer pattern), and a
+path no list claims, or two claim equally, fails the build.
+
+`build.rs` (`build_install.rs`) stages everything into `target/destdir` and writes each set's
+**mtree(5) specification**, `target/sets/<set>.mtree`: every entry with `type`, `mode`, `uid`,
+`gid` and `time`, files with `size` and `sha256digest`, links with `link`, each set also
+listing the directories above its paths so it stands alone. Hard links are staged as host
+hard links and `makefs` keeps them as one inode. The image carries each set's specification as
+`/etc/mtree/<set>.mtree`.
 
 4.3.2. Sets:
 
@@ -446,7 +460,12 @@ root both wait on it.
    7), and `DIOCGMEDIASIZE`/`DIOCGSECTORSIZE` on raw disk devices (§4.2.3). The host builds of
    both tools land with their first use, in commit 4.
 3. `lib/libmtree`, `makefs -t oxfs` and `mkimg` (a GPT data disk), for the host and the target.
-4. Sets staged with mtree specs by `build.rs`; images built and checked; still unused.
+4. Sets staged with mtree specs by `build.rs`; images built and checked; still unused. Landed
+   with the install list and set lists (§4.3.1). Checked by comparing the image entry by entry
+   with a filesystem the kernel seeded: identical in every path, type, mode, owner, content and
+   hard-link group but for the self-check's leftovers and `/etc/mtree`. Found on the way: the
+   seeding put `/usr/lib/libunwind.a` in twice (two records of one name), and neither the
+   writer nor `fsck_oxfs` caught duplicate names; both do now.
 5. The switch: the runner boots from the images (§4.5); seeding, `format_fresh_filesystem` and
    `format-blank` removed from the kernel.
 5b. `makefs -t msdos`, the EFI system partition and BIOS boot in `mkimg`; the disk-boot test
