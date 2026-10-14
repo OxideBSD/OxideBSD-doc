@@ -1,11 +1,7 @@
 # OxideBSD copy-on-write fork: design specification
 
-Status: **in progress** (2026-10-13): commits 1-3 of §9 landed (frame lock rule, reference
-counts, COW fork and the write fault, OxideBSD `560540e`); the OOM killer, `oom_adj` and real
-vfork remain. Follows RAM_FLOOR.md (the 128 MB floor), where
-eager-copy `fork` became the largest remaining cost: every fork copies every private page of the
-parent, so at 28 MB `syslogd` (linked with libcrypto) can't fork, and the POSIX test
-`shm_open/23-1.c` (1000 forks) takes about two minutes.
+Status: **in progress** (2026-10-14): commits 1-4 of §9 landed (frame lock rule, reference
+counts, COW fork and the write fault, the OOM killer); `oom_adj` and real vfork remain.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -98,9 +94,19 @@ resident pages, scaled by its `oom_adj` (§6.3) -- never pid 1 and never a proce
 -1000. It's killed with `SIGKILL`, logged to the console and the message buffer as
 `pid N (name), N pages: killed, out of memory` (FreeBSD's `vm_pageout_oom` wording).
 
-6.2. If the victim is the faulting process, the fault doesn't return to it. Otherwise the faulter
-waits (sleeping through the scheduler, as for any other resource) until the victim's memory is
-freed, then retries; if no victim can be found, the faulter itself is killed.
+6.2. If the victim is the faulting process, the fault doesn't return to it. Otherwise, from a
+ring-3 fault (where the kernel holds nothing, as at a system call), the victim is terminated on
+the spot as `kill(2)` would, and the faulting instruction retries (after the filesystem lock's
+holder finishes, when the termination had to wait for it). From a ring-0 fault inside a copy
+routine the kernel doesn't know what the interrupted system call holds, and terminating a process
+closes its files: the victim is only sent `SIGKILL` and the copy fails with `EFAULT`. If no victim
+can be found, the faulter itself is killed (from ring 0: `SIGKILL` at the end of the call).
+Amended 2026-10-14 (the original said the faulter always sleeps until the victim's memory is
+freed).
+
+6.2a. Delivering a fault signal writes the fault trampoline's scratch page (`process::
+fault_trampoline`), so that page is never shared copy-on-write: fork gives the child its own copy
+(failing with `ENOMEM` if it can't), or the OOM killer's own `SIGKILL` could need a frame to land.
 
 6.3. **`oom_adj`**: a per-process value from -1000 to 1000, default 0, inherited across fork and
 exec: score = private pages × (1000 + `oom_adj`) / 1000; -1000 means never chosen. Only root may
