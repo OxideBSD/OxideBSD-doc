@@ -21,7 +21,7 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 |--------|----------|
 | Native (`bin/`, 23) | `cat`, `chmod`, `cp`, `echo`, `false`, `kill`, `link`, `ln`, `ls`, `mkdir`, `mv`, `nproc`, `pwd`, `rm`, `rmdir`, `sh`, `sleep`, `sync`, `test`, `touch`, `true`, `unlink`, `vi` |
 | Links (1) | `[` = `test` |
-| BusyBox (20) | `ash`, `date`, `dd`, `df`, `ed`, `egrep`, `expr`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `pgrep`, `pkill`, `realpath`, `sed`, `stty`, `tar`, `timeout`, `zcat` |
+| BusyBox (21) | `ash`, `date`, `dd`, `df`, `ed`, `egrep`, `expr`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `pgrep`, `pkill`, `ps`, `realpath`, `sed`, `stty`, `tar`, `timeout`, `zcat` |
 
 `sh` is OxideBSD's own shell (`lib/libsh`). `vi` is OpenVi (`bin/vi`). `ash` remains for autoconf
 `configure` scripts and as `/sbin/emergency`'s fallback shell.
@@ -43,9 +43,9 @@ Not yet present, and expected here: `ifconfig` and `route` (need interface-confi
 | Source | Programs |
 |--------|----------|
 | Native (`usr.bin/`, 9) | `apropos`, `crontab`, `logger`, `login`, `man`, `mkimg`, `more`, `oxdoc`, `passwd` |
-| Forks and vendored ports (9) | `bmake` (`usr.bin/make`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`), `sudo` and `su` (`external/mit/sudo-rs`, set-user-ID root, mode 4755) |
+| Forks and vendored ports (12) | `bmake` (`usr.bin/make`), `clear`, `tput`, `tset` (and `reset`, a link to it; `lib/ncurses`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`), `sudo` and `su` (`external/mit/sudo-rs`, set-user-ID root, mode 4755) |
 | Links (5) | `whatis` -> `apropos`, `less` -> `more`, `make` -> `/usr/bin/bmake`, `clang++` -> `clang`, `sudoedit` -> `sudo` |
-| BusyBox (103) | listed in `BUSYBOX_APPLETS.md` §2 (BusyBox `su` is built but not installed) |
+| BusyBox (95) | listed in `BUSYBOX_APPLETS.md` §2 |
 
 Clang's resource directory is `/usr/lib/clang/23`.
 
