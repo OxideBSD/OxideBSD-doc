@@ -303,6 +303,11 @@ no oxfs partition, or an unformatted one, is not mounted; the kernel says so and
 kernel: piece C fills it from the mfsroot image. Until then a boot with no disk has no root
 filesystem.
 
+4.2.3. A raw disk device answers `DIOCGMEDIASIZE` (size in bytes, `i64`) and `DIOCGSECTORSIZE`
+(`u32`, 512), FreeBSD's `<sys/disk.h>` names with OxideBSD's own request numbers
+(`sys/drivers/disk.rs`), so `newfs_oxfs` sizes a partition without being told. (Decided
+2026-10-13, as were `-L` with a 32-byte label in the superblock and `-i` preallocating inodes.)
+
 ### 4.3. Sets and their manifests
 
 4.3.1. `build.rs` stages each **dist set** as a directory tree under `target/sets/<set>/` plus an
@@ -422,7 +427,10 @@ root both wait on it.
 ### 4.10. Commits
 
 1. `lib/liboxfs`: the format moved out of the module; module uses it; no behaviour change.
-2. `newfs_oxfs` (target and host) and the host `fsck_oxfs` build.
+2. `newfs_oxfs` (target and host): the format writer in liboxfs (`Writer`, over a
+   `BlockDevice`), `-N`/`-L`/`-i`/`-s`, a volume label in the superblock (`SUPERBLOCK_VERSION`
+   7), and `DIOCGMEDIASIZE`/`DIOCGSECTORSIZE` on raw disk devices (§4.2.3). The host builds of
+   both tools land with their first use, in commit 4.
 3. `makefs-oxfs` and `mkimg-oxfs`.
 4. Sets staged with mtree specs by `build.rs`; images built and checked; still unused.
 5. The switch: the runner boots from the images (§4.5); seeding, `format_fresh_filesystem` and
