@@ -1,7 +1,8 @@
 # OxideBSD copy-on-write fork: design specification
 
-Status: **in progress** (2026-10-14): commits 1-4 of §9 landed (frame lock rule, reference
-counts, COW fork and the write fault, the OOM killer); `oom_adj` and real vfork remain.
+Status: **in progress** (2026-10-14): commits 1-5 of §9 landed (frame lock rule, reference
+counts, COW fork and the write fault, the OOM killer, `oom_adj` with `procctl(2)` and `protect(1)`);
+real vfork remains.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -114,8 +115,17 @@ lower it. Set through a new system call in the process module (OxideBSD's own nu
 FreeBSD's `procctl(2)` shape: `procctl(P_PID, pid, PROC_OOM_ADJ_CTL, &value)`), read back through
 `PROC_OOM_ADJ_STATUS`, and shown as `/proc/<pid>/oom_adj`; a userland tool, `protect(1)`
 (FreeBSD's name, which marks a process protected from the OOM killer), sets -1000 for
-`protect pid`/`protect command` and `-a VALUE` for any other value. (The tool's options and the
-system call's number are specified with that commit.)
+`protect pid`/`protect command` and `-a VALUE` for any other value.
+
+6.4. Specified with the commit (2026-10-14, the user's choices): `procctl(2)` is system call 585,
+a general per-process control call in its own kernel module (`procctl`), FreeBSD's
+`procctl(idtype, id, cmd, data)` shape with musl's `idtype_t` values (`P_PID` 1, `P_PGID` 2; id 0
+names the caller or its group) and OxideBSD's own commands: `PROC_OOM_ADJ_CTL` (1) and
+`PROC_OOM_ADJ_STATUS` (2, `P_PID` only), `data` an `int *`. Raising a process's value needs
+`kill(2)`'s permission over it; lowering it needs the superuser. Over a group the call succeeds if
+it changed any process. `protect(1)` takes FreeBSD's options, `protect [-i] [-a adj] command` and
+`protect [-cdi] [-a adj] -g pgrp | -p pid` (`-c` sets 0, `-d` also descendants, found through
+`/proc`; `-i` is accepted, the value always being inherited). Man pages `procctl.2`, `protect.1`.
 
 ## 7. Real vfork
 

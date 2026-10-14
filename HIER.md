@@ -42,7 +42,7 @@ Not yet present, and expected here: `ifconfig` and `route` (need interface-confi
 
 | Source | Programs |
 |--------|----------|
-| Native (`usr.bin/`, 9) | `apropos`, `crontab`, `logger`, `login`, `man`, `mkimg`, `more`, `oxdoc`, `passwd` |
+| Native (`usr.bin/`, 10) | `apropos`, `crontab`, `logger`, `login`, `man`, `mkimg`, `more`, `oxdoc`, `passwd`, `protect` |
 | Forks and vendored ports (12) | `bmake` (`usr.bin/make`), `clear`, `tput`, `tset` (and `reset`, a link to it; `lib/ncurses`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`), `sudo` and `su` (`external/mit/sudo-rs`, set-user-ID root, mode 4755) |
 | Links (5) | `whatis` -> `apropos`, `less` -> `more`, `make` -> `/usr/bin/bmake`, `clang++` -> `clang`, `sudoedit` -> `sudo` |
 | BusyBox (95) | listed in `BUSYBOX_APPLETS.md` §2 |
