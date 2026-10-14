@@ -1,6 +1,8 @@
 # OxideBSD copy-on-write fork: design specification
 
-Status: **specified** (2026-10-13), not implemented. Follows RAM_FLOOR.md (the 128 MB floor), where
+Status: **in progress** (2026-10-13): commits 1-3 of §9 landed (frame lock rule, reference
+counts, COW fork and the write fault, OxideBSD `560540e`); the OOM killer, `oom_adj` and real
+vfork remain. Follows RAM_FLOOR.md (the 128 MB floor), where
 eager-copy `fork` became the largest remaining cost: every fork copies every private page of the
 parent, so at 28 MB `syslogd` (linked with libcrypto) can't fork, and the POSIX test
 `shm_open/23-1.c` (1000 forks) takes about two minutes.
