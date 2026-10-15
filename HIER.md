@@ -26,12 +26,13 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 `sh` is OxideBSD's own shell (`lib/libsh`). `vi` is OpenVi (`bin/vi`). `ash` remains for autoconf
 `configure` scripts and as `/sbin/emergency`'s fallback shell.
 
-## 3. `/sbin` (22 entries)
+## 3. `/sbin` (25 entries)
 
 | Source | Programs |
 |--------|----------|
 | Native (`sbin/`, 16) | `dmesg`, `emergency`, `fsck`, `fsck_oxfs`, `init`, `init_sh`, `lsoxmod`, `mount`, `newfs_oxfs`, `nologin`, `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount`, `update` |
-| Links (4) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `lsmod` -> `lsoxmod` |
+| Third-party (1) | `zstd` (`external/bsd/zstd`, static, so a set archive unpacks before `/usr` exists; `RAM_FLOOR.md` §4.3.4) |
+| Links (6) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `lsmod` -> `lsoxmod`, `unzstd` = `zstd`, `zstdcat` = `zstd` |
 | BusyBox (2) | `mknod`, `ping` |
 
 `init_sh` is the non-interactive interpreter for `/etc/rc` and `/etc/rc.d/*` (`INIT_SH.md`).

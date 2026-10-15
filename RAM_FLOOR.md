@@ -1,8 +1,8 @@
 # OxideBSD RAM floor: design specification
 
-Status: **piece A implemented** (2026-10-13, `c6b3691`..`f7bf9c9`, per-step commits in §3.8);
-**piece B implemented but for §4.10 steps 5b (a bootable disk image) and 7 (set archives)**
-(2026-10-13); 64 MB reached under UEFI and BIOS (2026-10-14, `efcec68`); piece C in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
+Status: **pieces A and B implemented** (A 2026-10-13, `c6b3691`..`f7bf9c9`, per-step commits in
+§3.8; B 2026-10-13..15, §4.10, but for `oxupdate`, which waits for the VFS); 64 MB reached under
+UEFI and BIOS (2026-10-14, `efcec68`); piece C in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -367,9 +367,17 @@ builds; `SOURCE_DATE_EPOCH`'s rule). (Decided by Claude while writing this; open
 archive of the staged tree, its mtree included as `./etc/mtree/<set>.mtree` (`base` only carries
 `/etc/mtree` itself, so the specs of all installed sets live there), compressed with zstd. These
 are the distribution format the installer and network installs will use. The target gets a
-static `zstd` decompressor in `/sbin` (upstream zstd, vendored at `external/bsd/zstd`, BSD
-licence; FreeBSD ships the same in base) so a set can be unpacked by a static `/sbin`
-program before `/usr` exists. Unpacking itself is the installer's milestone.
+static `zstd` in `/sbin`, with `unzstd` and `zstdcat` as hard links (upstream zstd 1.5.7, the
+fork `OxideBSD/zstd-oxidebsd` at `external/bsd/zstd`, BSD licence; FreeBSD ships the same in
+base) so a set can be unpacked by a static `/sbin` program before `/usr` exists. Unpacking
+itself is the installer's milestone.
+
+As built (2026-10-15): `build_install.rs` writes the ustar archive itself (entries in the
+specification's order, every time the build epoch, owners 0 named `root`/`wheel`, a hard-linked
+file's data under its first name in the archive) and pipes it through a host build of the same
+vendored zstd at level 19, multithreaded (the output doesn't depend on the thread count). Level
+19 keeps zstd's 8 MiB window, so a 64 MB machine can unpack a set; `--long` is not used. An
+archive is rewritten only when its set's specification or zstd changes.
 
 ### 4.4. Images
 
@@ -390,6 +398,24 @@ and BIOS boot: Limine's MBR code and stage 2 in a BIOS boot partition, installed
 itself (FreeBSD mkimg's bootcode option), doing what `limine bios-install` does, so it works on
 the target too. The QEMU runner keeps booting the ISO with the image as its data disk; a test
 boots the disk image alone, on BIOS and on UEFI.
+
+As built (2026-10-15):
+
+- FAT's on-disk format is `lib/libmsdosfs` (`msdosfs_format`, `no_std`, allocation-free, FAT12/16/32
+  boot sectors, long names, short-name aliases with numeric tails, DOS times), for the kernel's
+  msdosfs to share later. `makefs -t msdos` writes FAT32 only (`-o fat_type=32`, `volume_label=`,
+  `volume_id=`, `sectors_per_cluster=`; FreeBSD's option names): every directory and file in one
+  contiguous run, a volume id derived from the label and time, so an image is reproducible.
+  `fsck.fat` finds nothing to fix, and mtools reads back what went in.
+- `mkimg -b <limine-bios-hdd.bin>` with a `-p bios::<size>` partition (type `Hah!IdontNeedEFI`)
+  on GPT, or the gap before the first partition on MBR (whose first partition it then marks
+  active): byte-identical to `limine bios-install` on the same disk, both schemes.
+- The kernel is cargo's product, not build.rs's, so the image is assembled after it, by
+  `scripts/mkbootimg.sh <bootdir> <out.img>` from what the runner stages for the ISO
+  (`target/iso_root/boot`): GPT, a 64 KiB BIOS boot partition, a 64 MiB ESP
+  (`EFI/BOOT/BOOT{X64,IA32}.EFI`, `boot/limine/{limine-bios.sys,limine.conf}`, `boot/kernel`,
+  `boot/fsconf`) and `root.img` as `rootfs`. The tests `disk_boot` (UEFI) and `disk_boot_bios`
+  boot it with no ISO to a login prompt.
 
 ### 4.5. The QEMU runner
 
@@ -484,11 +510,12 @@ root both wait on it.
    the (debug) kernel image from 333 MB to 35 MB. The format self-check went with the seeding
    (its fixtures are in the tests set), and with it the module's kernel-segment copy path.
 5b. `makefs -t msdos`, the EFI system partition and BIOS boot in `mkimg`; the disk-boot test
-   (§4.4.4).
+   (§4.4.4). Landed 2026-10-15 (`510cd25`): `lib/libmsdosfs`, `scripts/mkbootimg.sh`, tests
+   `disk_boot` and `disk_boot_bios`.
 6. pid 1 from the root filesystem (§4.6.3); `init`, `sh`, `emergency` and `start_init` no longer
    embedded; INIT.md amended. Landed: the boot kernel image went from 6.0 MB to 3.5 MB (debug
    sections stripped), its read-only data from 3.8 MB to 1.25 MB.
-7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`.
+7. Set archives (`.tar.zst`) and the static `zstd` in `/sbin`. Landed 2026-10-15 (`69a79ae`).
 8. The 128 MB boot-to-login test (§4.9). Landed: `tests/ram_floor_boot.rs` (the real kernel; the
    runner passes it at `login:` and fails it at a panic or any out-of-memory, 128 MB by default).
 
