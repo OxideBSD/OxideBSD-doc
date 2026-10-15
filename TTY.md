@@ -40,11 +40,14 @@ them on the console. `/dev/klog` reads it, consuming, for `syslogd`; `dmesg` rea
 2.4. **`/dev/tty`** opens the calling process's controlling terminal, or fails with `ENXIO` if it
 has none.
 
-2.5. **COM1** is not a terminal. It carries the kernel's messages. With the boot flag `-D` (dual
-console, as in FreeBSD) it also carries a copy of everything written to `ttyv0`, which is how tests
-read their results; `-h` (serial console) sends `ttyv0`'s output to COM1 only. Without either
-flag the console is the screen alone: each byte to COM1 costs a port write, an exit to the
-hypervisor under a virtual machine.
+2.5. **COM1** is not a terminal of its own. It carries the kernel's messages. With the boot flag
+`-D` (dual console, as in FreeBSD) it also carries a copy of everything written to `ttyv0`, which
+is how tests read their results; `-h` (serial console) sends `ttyv0`'s output to COM1 only.
+Without either flag the console is the screen alone: each byte to COM1 costs a port write, an
+exit to the hypervisor under a virtual machine. With either flag, what COM1 receives is
+`ttyv0`'s input as well, next to the keyboard's: one terminal, two keyboards (COM1's receive
+interrupt, IRQ 4, one interrupt per byte). A test types on it headlessly by putting the bytes in
+`tests/<name>.serial`; the runner sends them once the guest prints `serial input: ready`.
 
 **Rationale.** NetBSD and OpenBSD name the serial ports `tty00`, `tty01`...; FreeBSD's `ttyu0` is
 the exception. Keeping COM1 (`tty00`) as the log and test channel, and putting the login line on
@@ -181,7 +184,7 @@ As of 2026-10-01 (OxideBSD `946dfa0`). The work is split into five slices; slice
 
 | Item | Section | Where |
 |---|---|---|
-| Per-terminal state; `ttyv0` driving the console, its output copied to COM1 (before output processing) with `-D` | 2.1, 2.2, 2.5 | `sys/tty/mod.rs`, `sys/tty/console.rs` |
+| Per-terminal state; `ttyv0` driving the console, its output copied to COM1 (before output processing) with `-D` or `-h`, and COM1's input fed to it | 2.1, 2.2, 2.5 | `sys/tty/mod.rs`, `sys/tty/console.rs`, `sys/console/serial.rs` |
 | Canonical mode, `VMIN`/`VTIME`, echo flags, input and output processing, flow control | 3 | `sys/tty/mod.rs` |
 | Signal characters from `c_cc`; 4.4BSD default `termios` | 3.6, 3.8 | `sys/tty/mod.rs` |
 | Blocking reads and writes, `EAGAIN`, `EINTR`; `poll`/`select` readiness | 4 | `sys/tty/mod.rs`, `sys/net/mod.rs` |
