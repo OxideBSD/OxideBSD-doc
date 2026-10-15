@@ -38,14 +38,14 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 
 Not yet present, and expected here: `ifconfig` and `route` (need interface-configuration ioctls).
 
-## 4. `/usr/bin` (126 entries)
+## 4. `/usr/bin` (127 entries)
 
 | Source | Programs |
 |--------|----------|
-| Native (`usr.bin/`, 10) | `apropos`, `crontab`, `logger`, `login`, `man`, `mkimg`, `more`, `oxdoc`, `passwd`, `protect` |
+| Native (`usr.bin/`, 12) | `apropos`, `crontab`, `ipcrm`, `ipcs`, `logger`, `login`, `man`, `mkimg`, `more`, `oxdoc`, `passwd`, `protect` |
 | Forks and vendored ports (12) | `bmake` (`usr.bin/make`), `clear`, `tput`, `tset` (and `reset`, a link to it; `lib/ncurses`), `nano` (`usr.bin/nano`), `ninja` (`usr.bin/ninja`), `clang`, `ld.lld` (`external/apache2/llvm`), `openssl` (`external/apache2/openssl`), `zdump` (`external/public-domain/tz`), `sudo` and `su` (`external/mit/sudo-rs`, set-user-ID root, mode 4755) |
 | Links (5) | `whatis` -> `apropos`, `less` -> `more`, `make` -> `/usr/bin/bmake`, `clang++` -> `clang`, `sudoedit` -> `sudo` |
-| BusyBox (95) | listed in `BUSYBOX_APPLETS.md` §2 |
+| BusyBox (94) | listed in `BUSYBOX_APPLETS.md` §2 |
 
 Clang's resource directory is `/usr/lib/clang/23`.
 
