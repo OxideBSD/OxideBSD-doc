@@ -1,6 +1,6 @@
 # OxideBSD demand-paged file mappings: design specification
 
-Status: **draft** (2026-10-14), not implemented. Answers `PAGECACHE.md` §6 open question 1. Specified
+Status: **implemented** (2026-10-14). Answers `PAGECACHE.md` §6 open question 1. Specified
 with the user; implementation follows.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -26,10 +26,19 @@ Copy-on-write private file mappings, made from cache pages, are a later step (§
 
 ## 3. Mapping
 
-3.1. `mmap` and `execve` record the region (`mm::MmapFileRegion`, and its exec equivalent) with
-its cache entry and first file page, register the entry as used by the address space
-(`AddressSpace::use_cached`) **before anything else** (the 2026-10-14 reclaim race, `72dd178`),
-and create no page table entries for its pages.
+3.1. `mmap` and `execve` register the entry as used by the address space
+(`AddressSpace::use_cached`) **before anything else** (the 2026-10-14 reclaim race, `72dd178`)
+and give each page a **`FILE_LEAF` entry** (`memory::address_space`, PTE bit 54): not present,
+owning no frame, its address bits holding the cache entry (20 bits) and the file page (20 bits),
+its `USER_ACCESSIBLE` and `NO_EXECUTE` the permissions the page will get. The fault reads
+everything it needs from the entry itself: no table or region lookup, no lock. Cache entry ids
+are reused once their entry is gone (only then does no page table name them), so they stay
+small; a file past 4 GiB, or an id that doesn't fit, is filled when mapped instead.
+
+3.3. The page table walks treat a `FILE_LEAF` entry as follows: `fork` copies it as it is (the
+child shares the entry, `pagecache::fork_uses`); `munmap` and teardown forget it; `mprotect` and
+`mlock` fill it first (a page made `PROT_NONE` must not become readable at its first touch; a
+locked page is resident).
 
 3.2. A cache entry in use by any address space keeps its inode in use
 (`oxidebsd_inode_in_use`), as a mapped file's region does today (`mm::content_mapped`): an
@@ -59,8 +68,19 @@ of consecutive blocks (`(file page, disk block, length)`), so a file written in 
 few runs whatever its size. The entry keeps it.
 
 5.2. A fill reads the page's block straight from the disk driver (`drivers::disk`), not through
-oxfs, so it needs no filesystem lock and is safe at any fault. A page past the end of the file is
-zero; a hole in the file (no block) is zero.
+oxfs, so it can't land inside an oxfs operation. It still takes the filesystem lock, which is
+what serializes the disk (recursive: a fault inside oxfs already holds it). A page past the end
+of the file is zero; a hole in the file (no block) is zero.
+
+5.2.1. **Who may wait.** A system call or a ring-3 fault holds no spin lock: it may wait for the
+lock and sleep for the disk. A fault in a copy routine may not know what the interrupted code
+holds (a system call copies in under the process table's lock, found at 28 MB: the disk wait
+then spun on that lock forever), so its fill waits for nothing: it fails (`EFAULT`, logged
+`[vm] ...`) if another process holds the filesystem lock, takes the frame allocator only if it's
+free, polls the disk instead of sleeping (`fslock::NoSleep`), and releases the lock without
+waking anyone (`fslock::exit_quiet`): waking takes the process table's lock too, and a process
+still counted as waiting was already woken by the holder before (found: `do_mmap` copying in
+under the table's lock hung `sudo`, `clang++` and `ninja`).
 
 5.3. **Change.** oxfs calls `oxidebsd_content_changed` before it rewrites or frees any of a file's
 blocks (`release_inode`, the write and resize paths). For an entry still in use, the kernel then
@@ -69,10 +89,10 @@ contents they mapped, as today, and never read blocks oxfs has since given to an
 the entry is retired as today. (Its cost is the file's unfilled pages, once, and only when a
 mapped program or library changes.)
 
-5.4. oxfs's buffer cache: a block the cache holds dirty (not yet written) must be read from the
-buffer cache, not the disk. [To check during implementation: whether oxfs ever keeps a file's
-newer contents only in its buffer cache; if so §5.3 fills from it, or the block map call flushes
-the file first.]
+5.4. oxfs's buffer cache delays a file's data writes. The block map call puts the file's
+delayed writes on the disk first (`sync_file`), and every later change goes through §5.3, so the
+disk holds what the entry's pages must show. A tmpfs file, in memory rather than on the disk, has
+no block map and is filled when mapped, as before.
 
 ## 6. Verification
 
