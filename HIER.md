@@ -1,6 +1,6 @@
 # OxideBSD programs: file placement inventory
 
-Status: **current** (2026-10-01, `946dfa0`).
+Status: **current** (2026-10-15, `c2595d0`).
 
 ## 1. Scope
 

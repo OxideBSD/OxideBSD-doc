@@ -1,7 +1,7 @@
 # OxideBSD POSIX system calls: coverage
 
-Status: **current** (2026-10-01, `946dfa0`). Highest assigned system call number: `584`
-(`SYS_NMOUNT`).
+Status: **current** (2026-10-15, `c2595d0`). Highest assigned system call number: `586`
+(`SYS_VFORK`).
 
 ## 1. Scope
 
@@ -20,7 +20,7 @@ Method: every `SYS_*` macro referenced in `external/mit/musl/src` was resolved t
 
 2.1. Before assigning a number, check `sys/syscall/`, `sys/modules/*/src` and `syscall.h.in` for
 the current highest. Invented numbers go at `471` and above (collision-free with musl `v1.2.6`);
-the current highest is `584`.
+the current highest is `586`.
 
 2.2. Check the `__NR_*` macro name as well as the value: two macros with different names and the
 same value compile without warning, and a duplicate name silently wins by textual order.
@@ -55,11 +55,9 @@ number, so the call fails with `ENOSYS` (or, where noted, the interface fails an
 
 | Interface(s) | Limit |
 |---|---|
-| `mprotect` | Enforced only in the `mmap` window; elsewhere a no-op. No `NX` bit anywhere. |
 | `setrlimit`/`getrlimit` (`prlimit64`) | Limits are stored and returned; only `RLIMIT_MEMLOCK` is enforced. No `SIGXCPU`/`SIGXFSZ`. |
 | `msync` | Real (`66b9aef`); writeback also happens at `munmap` and exit. |
-| `mlock`, `munlock`, `mlockall`, `munlockall` | No paging exists, so locking has no effect beyond `mlockall(MCL_FUTURE)`/`RLIMIT_MEMLOCK` accounting (`374ed00`). |
-| `fork` | Eager full copy; no copy-on-write. |
+| `mlock`, `munlock`, `mlockall`, `munlockall` | Nothing is paged out (no swap), so locking only fills demand-paged file pages in advance (`DEMANDPAGE.md`) and does the `mlockall(MCL_FUTURE)`/`RLIMIT_MEMLOCK` accounting (`374ed00`). |
 | `sem_open`, `sem_close`, `sem_unlink`, `shm_open`, `shm_unlink` | No system call of their own: musl backs them with `open`/`mmap(MAP_SHARED)` in devfs's `/dev/shm` (`4b8ff01`) and shared futexes keyed on physical address (`7122adc`). |
 | `getlogin`, `getlogin_r` | musl reads `LOGNAME`; no kernel involvement. |
 
@@ -68,7 +66,7 @@ number, so the call fails with `ENOSYS` (or, where noted, the interface fails an
 | Interface(s) | Reason |
 |---|---|
 | `aio_*`, `lio_listio` | musl implements POSIX AIO with a userspace thread pool over `clone`/`futex`. |
-| `posix_spawn`, `posix_spawnp` and their attribute/file-action families | musl implements them over `vfork`/`execve`, both present. |
+| `posix_spawn`, `posix_spawnp` and their attribute/file-action families | musl implements them over `vfork` (a real one since `a0f9b73`) and `execve`. |
 | `fexecve` | musl calls `execveat(fd, "", AT_EMPTY_PATH)` (`574`, `9bb309e`). |
 | `ttyname`, `ttyname_r` | musl reads `/proc/self/fd/N`; oxfs resolves a tty descriptor to `/dev/<name>` (`fde98f6`). |
 | `tcgetsid` | `ioctl(TIOCGSID)`, handled by `SYS_IOCTL` (`8deb5e2`). |
@@ -119,7 +117,8 @@ crate.
 | Background-process `SIGTTIN`/`SIGTTOU`, `tcgetsid` | — | `sys/tty` | `8deb5e2` | `TTY.md` §5.3. |
 
 OxideBSD-specific system calls in the same range (not POSIX): `sethostname` (`576`, `b212178`),
-`sysctl` (`583`, `f021210`), `nmount` (`584`, `8a7d30a`).
+`sysctl` (`583`, `f021210`), `nmount` (`584`, `8a7d30a`), `procctl` (`585`, `857ac30`), `vfork`
+(`586`, `a0f9b73`; `COW.md` §7).
 
 ## 7. Number remappings
 

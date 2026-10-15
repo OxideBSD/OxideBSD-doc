@@ -1,7 +1,8 @@
 # OxideBSD RAM floor: design specification
 
-Status: **piece A implemented** (2026-10-13, OxideBSD `c6b3691`..`f7bf9c9`; per-step commits in §3.8);
-piece B specified (§4); piece C in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
+Status: **piece A implemented** (2026-10-13, `c6b3691`..`f7bf9c9`, per-step commits in §3.8);
+**piece B implemented but for §4.10 steps 5b (a bootable disk image) and 7 (set archives)**
+(2026-10-13); 64 MB reached under UEFI and BIOS (2026-10-14, `efcec68`); piece C in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.

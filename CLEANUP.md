@@ -1,6 +1,6 @@
 # OxideBSD shortcuts: cleanup inventory
 
-Status: **working inventory** (started 2026-09-24, verified against `946dfa0` on 2026-10-01).
+Status: **working inventory** (started 2026-09-24, verified against `c2595d0` on 2026-10-15).
 Target release: v0.3.0 for items marked so.
 
 ## 1. Scope
@@ -26,7 +26,6 @@ fix lands, the row moves to §8 with its commit.
 | `nice`/`setpriority` stored, no effect on scheduling. | Affects scheduling | later |
 | `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` returns an all-zero `struct rusage`. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
-| Fork copies the whole address space eagerly. | Copy-on-write | later |
 
 ## 4. Files and descriptors
 
@@ -60,10 +59,9 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| Every file on the system is embedded in the kernel's oxfs module at build time and seeded on format: about 298 MiB of kernel `.rodata`, resident from boot, and copied again into the block pool. | A root filesystem image built separately; a small mfsroot for install and recovery | v0.3.0 (128 MB floor) |
-| BusyBox applets are 128 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
+| No mfsroot: a boot with no disk has no root file system to install or recover from. | A small mfsroot loaded beside the kernel | v0.3.0 (`RAM_FLOOR.md` piece C) |
+| BusyBox applets are 119 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
-| `mprotect` enforcement limited to the `mmap` window. | Everywhere | later |
 | After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
 | The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
 | Only `passwd(1)` changes `/etc/master.passwd` and `/etc/passwd` (through `pam_unix`); no tool adds or removes users or groups (`adduser`, `pw`, `vipw`). | They can | v0.3.0 |
@@ -72,6 +70,11 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-15 — BusyBox's `ipcs` and `ipcrm` replaced by native ones over `kern.ipc` sysctls; `security.bsd.see_other_uids` — 34b5b55
+- 2026-10-14 — `vfork` was a plain fork: the child borrows the parent's address space, the parent sleeps until exec or exit (`COW.md` §7) — 9786905, a0f9b73
+- 2026-10-14 — file mappings were filled at `mmap`/exec: demand-paged from the disk (`DEMANDPAGE.md`) — 2183878
+- 2026-10-13 — fork copied the whole address space eagerly: copy-on-write, with an OOM killer for overcommit (`COW.md`) — 560540e, adfef05
+- 2026-10-13 — every file on the system was embedded in the kernel's oxfs module and seeded on format (about 298 MiB of `.rodata`): the system is a separately built disk image, pid 1 is read from it (`RAM_FLOOR.md` piece B) — 26a3646, f7b6fa3
 - 2026-10-13 — `fsck_oxfs` freed files that lost their names: reconnected in `/lost+found` as `#<inode>` (made at format, or by fsck when missing) — 61dab9e
 - 2026-10-13 — every used disk block loaded into a fixed 1 GiB RAM pool at mount, `NUM_BLOCKS` compile-time: a RAM-sized buffer cache over the whole partition, demand reads, delayed writes in crash-safe order, sleeping disk I/O under a filesystem lock, a read-only root checked by `fsck_oxfs` (`RAM_FLOOR.md` piece A) — c6b3691 … f7bf9c9
 - 2026-10-11 — NX and W^X: no page writable and executable, kernel (Limine and Multiboot2) or user, with OpenBSD's `wxneeded`/`wxallowed` escape hatch; `mprotect` across the user range; fixture linker scripts page-aligned — 4f0c6d1, 4e2d6fd, d838d47, 13829d6, 6cc872c, 606e5b1

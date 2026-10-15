@@ -1,6 +1,6 @@
 # OxideBSD releases: roadmap
 
-Status: **v0.3.0 in progress** (2026-10-01, `946dfa0`). Latest release: v0.2.0 (tag `v0.2.0`,
+Status: **v0.3.0 in progress** (2026-10-15, `c2595d0`). Latest release: v0.2.0 (tag `v0.2.0`,
 2026-09-16).
 
 Superseded narrative and per-session progress notes from earlier versions of this file are in
@@ -67,8 +67,8 @@ Scope decided 2026-09-23 (items 1-3), extended 2026-09-24 (items 4-5) and 2026-1
 | 2 | Finish the Rust `std` target: the surface a `/bin` utility needs, verified by a `std` coverage consumer; `std` binaries are PIEs; the native `bin/` utilities rewritten as `std` apps. | In progress: target landed 2026-09-17 (private forks `OxideBSD/rust-oxidebsd` and `OxideBSD/libc-crate-oxidebsd`, branch `oxidebsd`); dynamic PIEs on `/lib/libc.so` and `/lib/libgcc_s.so.1` since 2026-09-30 (`ab98faf`), `/bin` and `/sbin` static (`33a69e6`); `bin/` rewrite partly done (`bc401ba`: sleep, sync, link, unlink, rmdir, nproc, kill, test, chmod), the 12 original oxlibc utilities remain. |
 | 3 | Native init: `/sbin/init` as a Rust `std` app, `/etc/rc`, `rc.d`, `rcorder`, `rc.conf` (`INIT.md`). | Done (`52656de`, `3e3241e`, `6899d9d`, `3295c7c`, `946dfa0`) |
 | 4 | Cleanup: OxideBSD acts like a regular OS instead of taking shortcuts. Inventory: `CLEANUP.md`. | In progress |
-| 5 | `sudo` via sudo-rs, with the kernel credentials, `/dev/tty`, pseudo-terminals and OpenPAM it needs; sudo-rs's `su` replaces BusyBox's (`SUDO.md`). | In progress: OpenPAM, getty, login and `/dev/tty` done (`093ec0e`, `fde98f6`); POSIX credentials, setuid exec and pseudo-terminals not started. |
-| 6 | A console install runs in 64 MB of RAM (amended 2026-10-14 from 128 MB; never more, forever): the kernel stops embedding the userland (the root filesystem is a separately built disk image, plus a small mfsroot for install and recovery); oxfs reads through a block cache sized from RAM instead of a fixed 1 GiB pool; a regression test boots to login with `-m 128`. The console install is the base system, networking and OpenSSL, man pages, the editors and doom; Clang/LLVM is an optional set and is not expected to be usable at 128 MB. | In progress: the oxfs buffer cache, delayed writes, read-only root and `fsck_oxfs` done (piece A, 2026-10-13); host image builder and mfsroot next (`RAM_FLOOR.md`) |
+| 5 | `sudo` via sudo-rs, with the kernel credentials, `/dev/tty`, pseudo-terminals and OpenPAM it needs; sudo-rs's `su` replaces BusyBox's (`SUDO.md`). | Done (`093ec0e`, `fde98f6`, `282249f`, `63fbf11`, `ea7b74b`) |
+| 6 | A console install runs in 64 MB of RAM (amended 2026-10-14 from 128 MB; never more, forever): the kernel stops embedding the userland (the root filesystem is a separately built disk image, plus a small mfsroot for install and recovery); oxfs reads through a block cache sized from RAM instead of a fixed 1 GiB pool; a regression test boots to login in 64 MB. The console install is the base system, networking and OpenSSL, man pages, the editors and doom; Clang/LLVM is an optional set and is not expected to be usable at 64 MB. | In progress: piece A (the oxfs buffer cache, delayed writes, read-only root, `fsck_oxfs`) and most of piece B (the host image builder; the kernel neither embeds, formats nor seeds the userland; pid 1 from the root file system) done 2026-10-13; boots to login in 64 MB under UEFI and BIOS since `efcec68` (2026-10-14), checked by `ram_floor_boot`. Left: piece B's bootable disk image and set archives, and piece C, the mfsroot (`RAM_FLOOR.md`). |
 
 Decisions:
 
@@ -86,7 +86,11 @@ demand-grown user stacks, ninja on target; terminals with a line discipline (`TT
 (`DEVFS.md`); oxfs inode and block reclamation; OpenSSL 3.5 LTS with the system trust store
 (`certctl(8)`) and the `openssl` crate; dynamic linking and `dlopen`; the loopback interface
 (`UNIX.md` §11.4); syslog over TCP and TLS (`SYSLOG.md` §8); cron; time zones; a read-only page
-cache (`PAGECACHE.md`). Placement of every binary: `HIER.md`.
+cache (`PAGECACHE.md`); copying user memory through `copyin`/`copyout`, SMEP and SMAP
+(`USERMEM.md`); NX and W^X; KPTI with PCID (`THREAT_MODEL.md` §3.3-3.4); copy-on-write fork, the
+OOM killer, `procctl(2)` and real `vfork` (`COW.md`); demand-paged file mappings
+(`DEMANDPAGE.md`); native `ipcs`/`ipcrm`; serial console input. Placement of every binary:
+`HIER.md`.
 
 ### 3.3. v0.4.0: glibc and oxlibc
 
@@ -168,3 +172,7 @@ Not assigned to a release.
   `sched_setscheduler`/`sched_setparam` conformance files from UNSUPPORTED into tests. Needs an
   extended `struct sched_param` (musl header patch), a per-thread budget and priority state
   machine, and timer-driven replenishment. glibc and upstream musl don't implement it either.
+- **OxideBSD's own boot loader** (decided 2026-10-14). Hard requirement: it hands the OS 100% of
+  the RAM the firmware lets go -- ACPI-reclaimable memory reclaimed after parsing, and the ~3.7 MB
+  missing from OVMF's memory map at 64 MB accounted for. Until then Limine (our fork) stays, with
+  `LIMINE_FIRMWARE_RESERVE_MIB` and `memory::reclaim_bootloader_memory` (`RAM_FLOOR.md`).
