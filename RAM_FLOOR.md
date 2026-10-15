@@ -1,10 +1,21 @@
-# OxideBSD 128 MB RAM floor: design specification
+# OxideBSD RAM floor: design specification
 
 Status: **piece A implemented** (2026-10-13, OxideBSD `c6b3691`..`f7bf9c9`; per-step commits in §3.8);
 piece B specified (§4); piece C in outline. Target release: v0.3.0 (`ROADMAP.md`, item 6).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
+
+**Amended 2026-10-14: the floor is 64 MB, forever.** The user's rule: OxideBSD MUST NOT need
+more than 64 MB of RAM to boot and to run a console install, under UEFI as under BIOS; UEFI may
+need more only if the firmware (OVMF) itself does. Effort below 64 MB isn't spent. Where 128 MB
+appears below it is history. Measured 2026-10-14 (OxideBSD `2183878` onward): BIOS boots clean
+to login at 24 MB (demand-paged file mappings, `DEMANDPAGE.md`); UEFI at 64 MB once (1) our Limine
+fork leaves the firmware 8 MiB, not upstream's hardcoded 64 MiB (`LIMINE_FIRMWARE_RESERVE_MIB`, a
+build-time define: the reservation is made before `limine.conf` is read), and (2) the kernel
+reclaims bootloader-reclaimable memory before starting pid 1 (`memory::reclaim_bootloader_memory`:
+42 MB at 64 MB under UEFI), keeping Limine's page tables and the boot stack. OVMF itself was never
+the limit. `tests/ram_floor_boot.rs` boots at 64 MB.
 
 ## 1. Scope and motivation
 
@@ -481,8 +492,8 @@ root both wait on it.
    runner passes it at `login:` and fails it at a panic or any out-of-memory, 128 MB by default).
 
 Measured 2026-10-13 after commit 5 (and a debug-stripped boot kernel, tmpfs on demand): the
-system boots to login in 128 MB under UEFI (OVMF and Limine fail below ~128 MB before the kernel
-runs) and in 48 MB under BIOS; at 32 MB `/etc/rc` runs out of memory at syslogd's libcrypto.
+system boots to login in 128 MB under UEFI (Limine fails below ~128 MB before the kernel runs --
+its hardcoded 64 MiB firmware reserve, found 2026-10-14; OVMF was fine) and in 48 MB under BIOS; at 32 MB `/etc/rc` runs out of memory at syslogd's libcrypto.
 After commit 6: 32 MB under BIOS boots cleanly to login (48 MB leaves 41 MB usable, 27.5 MB
 free at a root shell); at 28 MB syslogd can't fork.
 
