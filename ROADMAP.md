@@ -172,6 +172,11 @@ Not assigned to a release.
   `sched_setscheduler`/`sched_setparam` conformance files from UNSUPPORTED into tests. Needs an
   extended `struct sched_param` (musl header patch), a per-thread budget and priority state
   machine, and timer-driven replenishment. glibc and upstream musl don't implement it either.
+- **OxideBSD/Linux** (raised 2026-10-15, a side project for much later). A Linux distribution
+  with OxideBSD's userland instead of GNU's, as Chimera Linux has FreeBSD's: stock musl, the Rust
+  `std` programs built for `x86_64-unknown-linux-musl`, Linux back ends for what reads OxideBSD
+  kernel interfaces (`kern.ipc`, `procctl`, the msgbuf). It also tests that the userland isn't
+  tied to the kernel.
 - **OxideBSD's own boot loader** (decided 2026-10-14). Hard requirement: it hands the OS 100% of
   the RAM the firmware lets go -- ACPI-reclaimable memory reclaimed after parsing, and the ~3.7 MB
   missing from OVMF's memory map at 64 MB accounted for. Until then Limine (our fork) stays, with
