@@ -1,8 +1,7 @@
 # OxideBSD copy-on-write fork: design specification
 
-Status: **in progress** (2026-10-14): commits 1-5 of §9 landed (frame lock rule, reference
-counts, COW fork and the write fault, the OOM killer, `oom_adj` with `procctl(2)` and `protect(1)`);
-real vfork remains.
+Status: **implemented** (2026-10-15): all six commits of §9 landed, real vfork last
+(`9786905`, `a0f9b73`).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
