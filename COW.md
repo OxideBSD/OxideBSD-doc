@@ -130,11 +130,38 @@ it changed any process. `protect(1)` takes FreeBSD's options, `protect [-i] [-a 
 ## 7. Real vfork
 
 7.1. `vfork()` and `clone(CLONE_VM|CLONE_VFORK)` (musl's `posix_spawn`) create a child that
-**borrows the parent's address space** (no page table copy); the parent sleeps until the child
-execs or exits, then resumes (the BSDs' semantics). The child runs on the stack it was given
-(`clone`) or the parent's (`vfork`), and must not return from the calling function (POSIX).
+**borrows the parent's address space** (no page table copy); the parent thread that called it
+sleeps until the child execs or exits, then resumes (the BSDs' semantics). The child runs on the
+stack it was given (`clone`) or the parent's (`vfork`), and must not return from the calling
+function (POSIX). Otherwise the child is a process of its own, as after fork: its own copy of the
+fd table, credentials, signal dispositions and pending signals; other threads of the parent keep
+running.
 
-7.2. Today's `vfork.s` patch in musl (vfork degraded to fork) is reverted to a real vfork.
+7.2. `vfork()` is its own system call, 586, registered by the `vfork` kernel module
+(`process::do_vfork`); the child resumes at the call site with 0. musl's `vfork.s` calls it (it
+used to alias `fork`), keeping the return address in a register, and converts a failure's carry
+flag to a negative errno (it returned the positive errno as a pid before).
+
+7.3. **The memory bookkeeping belongs to the address space** (`mm::VmState`, FreeBSD's `vmspace`):
+the break, the `mmap` file and physical region lists, memory locks, `wx_allowed` and the SysV
+shm attachment list live in the `AddressSpace`, shared by everything that shares its page tables.
+A child with bookkeeping of its own could attach a SysV segment, `IPC_RMID` it and exec; the
+exec's implicit detach would free frames the parent still maps. The cleanup at exit and exec
+(shm detach, `MAP_SHARED` writeback, `/dev/fb0`) is done by the address space's last live user.
+So the child MAY use `malloc`, `mmap` and the rest, as on the BSDs; POSIX leaves it undefined.
+
+7.4. **The parent's sleep** (`BlockReason::WaitingForVforkChild`, FreeBSD's `ppwait`) is
+re-checked after every wake. A caught signal stays pending until the child is done; a fatal one
+(SIGKILL, or a default action that terminates) kills the parent where it sleeps, and the child
+keeps the address space. A stop and continue leave it waiting.
+
+7.5. **Visibility**: the waiting parent's state is `D`, `D (ppwait)` in `/proc/<pid>/status`; the
+borrowing child's status has `PPWait: 1` (FreeBSD's `P_PPWAIT`, which its `ps` shows as `V`).
+BusyBox's `ps` reads only `/proc/<pid>/stat`'s one state letter and can't show `V`; a native
+`ps` will.
+
+7.6. **Out of memory**: the parent and the borrowing child are one address space, so the OOM
+killer (§6) kills them together when it chooses either.
 
 ## 8. Verification
 
@@ -145,6 +172,9 @@ execs or exits, then resumes (the BSDs' semantics). The child runs on the stack 
 - The suite and POSIX canary pass; `shm_open/23-1.c` is timed before and after.
 - The OOM killer: a test allocates and touches memory past RAM in a child with `oom_adj` 1000 while
   a protected (`-1000`) sibling survives; the victim's log line appears.
+- vfork: `regress/vfork-smoke` (through musl) checks the child's writes reach the parent, a
+  failed exec, `/proc` state, a pending SIGUSR1, SIGKILL of the waiting parent, the SysV case of
+  §7.3, `malloc` in the child, and `posix_spawn`.
 - RAM floor: `ram_floor_boot` keeps passing, and the BIOS floor is re-measured (28 MB failed on
   syslogd's fork).
 
@@ -157,7 +187,8 @@ execs or exits, then resumes (the BSDs' semantics). The child runs on the stack 
 3. COW fork and the write fault, rings 3 and 0 (§§3-5), with the fork regress test.
 4. The OOM killer (§6.1-6.2).
 5. `oom_adj`, its system call, `/proc/<pid>/oom_adj`, `protect(1)` (§6.3).
-6. Real vfork (§7), musl's `vfork.s` and `posix_spawn` path.
+6. The memory bookkeeping moved into the address space (§7.3), then real vfork (§7), musl's
+   `vfork.s` and `posix_spawn` path.
 
 ## 10. Decisions
 
@@ -165,3 +196,8 @@ execs or exits, then resumes (the BSDs' semantics). The child runs on the stack 
 (`oom_adj`, `protect(1)`); real vfork; reference counts in a dense per-frame array. Made while
 writing this, open to change: the COW bit is `BIT_53`; page tables stay copied; `oom_adj`'s range
 and scaling follow Linux's `oom_score_adj`, its interface FreeBSD's `procctl(2)`.
+
+2026-10-14, for vfork: the parent's wait yields only to fatal signals (Linux's killable wait); the
+OOM killer takes a borrowing pair together; `ppwait`/`P_PPWAIT` are shown as on FreeBSD; `vfork()`
+is a system call of its own in its own module; the memory bookkeeping moves into the address
+space (§7.3).
