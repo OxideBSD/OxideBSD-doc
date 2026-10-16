@@ -1,8 +1,8 @@
 # OxideBSD virtual file system: design specification
 
-Status: **draft, under review** (2026-10-15). Not implemented. Target release: v0.3.0 for steps 1-3
-of §11 (they unblock the kernel's msdosfs and `RAM_FLOOR.md` §4.7-4.8); the rest may slip to
-v0.4.0.
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Not
+implemented. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+`RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -49,18 +49,23 @@ Decided with the user (2026-10-15):
 
 ## 3. Module constraints and what follows from them
 
-3.1. Kernel modules have no heap and no `core::fmt`; their state is `static mut` or pools taken
-from `oxidebsd_module_alloc_zeroed` in `module_init`. This stays true (decided). The VFS is
-therefore shaped so that **the kernel allocates and a file system fills**:
+3.1. **Modules get a real allocator** (decided 2026-10-15), before any of the VFS (§11 step 0).
+Today a module has no heap and no `core::fmt`; its state is `static mut` or pools taken from
+`oxidebsd_module_alloc_zeroed` in `module_init`. Step 0 adds two kernel exports,
+`oxidebsd_kmalloc(size, align) -> *mut u8` and `oxidebsd_kfree(ptr, size, align)`, over the kernel
+heap, usable at any time a module runs (not only in `module_init`), and a small shared crate,
+`lib/libkmod`, that a module links to get a `#[global_allocator]` over them, so module code uses
+`alloc` (`Box`, `Vec`, `BTreeMap`) as kernel code does. Allocation failure returns null; the
+module's `alloc_error_handler` panics, which is fatal to the call as any module panic is. Every
+allocation a module makes is charged to it (`kern.module.<name>.alloc` sysctl), so a leak is
+visible. Whether `core::fmt` comes with it is decided by what step 0 finds about its size and
+relocations (§11).
 
-- A type declares, at registration, the size of its per-mount private data (`mnt_data`) and of
-  its per-vnode private data (`v_data`). The kernel allocates both, zeroed, alongside the
-  `struct mount` and the vnode, and frees them after `vfs_unmount` / `vop_reclaim`.
-- Names, paths and directory records cross the boundary in kernel-owned buffers (`struct
-  componentname`, `uio`), never as allocations a module makes.
-- A file system that needs a variable-size table (a FAT, an inode table) gets it per mount from a
-  new kernel export, `oxidebsd_mount_alloc(mp, bytes)`, freed with the mount. This is allocation
-  owned by the kernel and scoped to a mount, not a module heap. **Open question 1** (§12).
+Still, the VFS keeps the kernel's own objects kernel-allocated: a type declares the size of its
+per-mount private data (`mnt_data`) and per-vnode private data (`v_data`); the kernel allocates
+both, zeroed, with the `struct mount` and the vnode, and frees them after `vfs_unmount` /
+`vop_reclaim`. Names, paths and directory records cross the boundary in kernel-owned buffers
+(`struct componentname`, `uio`).
 
 3.2. The interface is C ABI throughout (`extern "C"`, `#[repr(C)]`), as the module boundary is
 today. A type registers with `oxidebsd_vfs_register(&VfsConf)`; the vnode operations are a
@@ -115,11 +120,10 @@ an unlinked file's storage: this replaces `oxidebsd_inode_in_use` and oxfs's orp
 inactive vnode may be recycled (`vop_reclaim`, then the memory reused). The number of vnodes is
 bounded by `kern.maxvnodes`, sized from RAM, so the 64 MB floor holds.
 
-5.4. **Open question 2**: locking. Today one giant sleepable lock (`fslock`) serializes the one
-file system module, keyed to that module's code range. The VFS keeps a giant lock in step 1 (one
-for all file system modules, not keyed to a code range) and moves to per-vnode locks with SMP
-(v0.5.0). Whether to introduce vnode locks now, as no-ops on one CPU, so file systems are
-written against them from the start, is the question.
+5.4. Locking (decided 2026-10-15): one giant sleepable lock for the VFS and every file system
+module until SMP, replacing today's `fslock`, which is keyed to the single serialized module's code
+range (a second file system module would break it). Per-vnode locks come with SMP (v0.5.0, §11
+step 6); file systems are not written against vnode locks before then.
 
 ## 6. Lookup (`namei`) and descriptors
 
@@ -161,10 +165,18 @@ no block device (tmpfs, procfs) fills through `vop_read`, as tmpfs does today.
 7.3. `content_changed` becomes the VFS's own invalidation on `vop_write`, `vop_setattr` (size)
 and reclaim; file systems no longer call it.
 
+7.4. **A shared buffer cache** (decided 2026-10-15): the kernel gets FreeBSD's `buf` layer in
+miniature (`sys/kern/vfs_bio.rs`): `bread(dev, blkno, size)`, `bwrite`, `bdwrite` (delayed),
+`bawrite`, `brelse`, per-device, sized from RAM, with the delayed-write ordering and the clean
+flag that oxfs's `bcache.rs` does today (`RAM_FLOOR.md` §3.2-3.3). oxfs drops `bcache.rs` and uses
+it; msdosfs uses it from the start. `update(8)`'s 30-second flush becomes `sync(2)` through it.
+Data blocks a file has mapped are in the page cache, metadata in the buffer cache; a block is
+never in both writable at once (FreeBSD's rule before its unified cache).
+
 ## 8. Devices and the special file systems
 
 8.1. `/dev` (devfs), `/proc` (procfs), tmpfs and nullfs become file system types of their own,
-each its own module, split out of oxfs (§11 step 2). devfs keeps building its tree from the
+each its own module, split out of oxfs (§11 step 3). devfs keeps building its tree from the
 kernel's device registry (`DEVFS.md`); tmpfs instances each get their own pool and their own
 `f_fsid`/`st_dev` (today all tmpfs mounts and devfs share device 2); `/dev/shm` stays a tmpfs.
 
@@ -186,8 +198,9 @@ FAT12, FAT16 and FAT32, read and write, long names.
 (owner, group and permission of every file, since FAT keeps none); the read-only attribute clears
 the write bits; lookup is case-insensitive and creation case-preserving; `-s` shows short names
 only, `-l` long names (the default); a name not representable is `EINVAL`. FAT times carry no
-zone: FreeBSD converts them with the kernel's UTC offset, so they read as local time (what
-Windows writes); OxideBSD's choice is **open question 3**.
+zone: they are local time (decided 2026-10-15), as FreeBSD and Windows have them, converted with
+the system's time zone (`/etc/localtime`, `TIMEZONE.md`), which the kernel learns from userland at
+boot (FreeBSD's `adjkerntz(8)`/`machdep.adjkerntz` in shape; the mechanism is part of step 4).
 
 9.3. File IDs are the position of the file's directory entry (cluster and offset), as FreeBSD's;
 a rename moves the entry, so the vnode's file ID is updated in place under the VFS's hash.
@@ -214,26 +227,29 @@ its step lands, or is struck from this list:
 Each step is its own commits; the suite and the POSIX canary stay at their baseline between
 steps.
 
-1. **VFS core with oxfs behind it.** `struct mount`, vnodes, `namei`, the name cache,
-   `struct file` and `fileops`, the kernel's `close`/`lseek`/`fstat`/`getdents`/`nmount`, the
-   block device interface; oxfs reimplemented as the `oxfs` type (its namei, mount table and fd
-   syscalls removed), still holding tmpfs, devfs and `/proc` inside it as today, mounted through
-   the VFS. Vnode-keyed page cache (§7). The big step.
-2. **Split out** tmpfs, devfs, procfs and nullfs as their own types and modules.
-3. **msdosfs** (§9); `/boot/efi` in `fstab` on systems with an ESP.
-4. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
-5. **Per-vnode locks** with SMP (v0.5.0).
+0. **A module allocator** (§3.1): `oxidebsd_kmalloc`/`kfree`, `lib/libkmod`, then oxfs's fixed
+   pools (`OPEN_FILES`, `PROC_RENDERS`, ...) moved to the heap as the first user.
+1. **Descriptors and block devices.** `struct file` and `fileops` (§6.4-6.5); the kernel's
+   `close`/`lseek`/`fstat`/`ioctl`/`ftruncate`/`fsync`; the block device interface (§8.2) and the
+   shared buffer cache (§7.4), oxfs moved onto it and `bcache.rs` deleted. Files are still named
+   by oxfs inode numbers.
+2. **Vnodes and `namei`.** `struct mount`, `vfsops`, vnodes, the kernel's `namei` and name cache,
+   `nmount`/`unmount`, `getdents` through `vop_readdir`, the one giant lock (§5.4); oxfs
+   reimplemented as the `oxfs` type, still holding tmpfs, devfs and `/proc` inside it; cwd, root,
+   the page cache (§7) and every other kernel holder of an inode number moved to vnodes;
+   `oxidebsd_inode_in_use` deleted. The biggest step.
+3. **Split out** tmpfs, devfs, procfs and nullfs as their own types and modules.
+4. **msdosfs** (§9), the kernel's time zone offset; `/boot/efi` in `fstab` on systems with an ESP.
+5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
+6. **Per-vnode locks** with SMP (v0.5.0).
+
+Steps 1 and 2 are the old single "VFS core" step split in two (Claude's call, 2026-10-15, open
+to veto): descriptors and the buffer cache don't depend on vnodes, and landing them first keeps
+each step reviewable and bisectable.
 
 ## 12. Open questions
 
-1. Per-mount kernel allocation for file system modules (§3.1): `oxidebsd_mount_alloc`, or modules
-   get a real allocator (the option set aside on 2026-10-15)?
-2. Vnode locks now (no-ops on one CPU) or with SMP (§5.4)?
-3. msdosfs times: local time like FreeBSD and Windows, or UTC (§9.2)?
-4. Does oxfs keep its own buffer cache (`bcache.rs`), or does the VFS get a shared buffer cache
-   (FreeBSD's `buf`) that msdosfs uses too? A shared one is more work now and less duplication.
-5. Is step 1 small enough? It could be split (vnodes and namei first with `struct file` as is,
-   then `struct file`), at the price of an interim adapter layer.
+None left from the review. New ones go here as steps uncover them.
 
 ## 13. Decisions
 
@@ -241,3 +257,7 @@ steps.
 and over giving modules an allocator first); staged migration, suite green at each step; msdosfs
 generic and read-write with `mount_msdosfs` semantics; this specification to be reviewed before any
 code.
+
+2026-10-15 (user, on review): modules get a real allocator (not per-mount kernel allocation
+only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
+cache for a shared one.
