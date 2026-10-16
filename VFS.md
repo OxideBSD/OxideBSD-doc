@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
 Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0
-and 1 of §11 implemented, step 2 in progress (2a done); 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+and 1 of §11 implemented, step 2 in progress (2a and 2b done); 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -274,15 +274,15 @@ a rename moves the entry, so the vnode's file ID is updated in place under the V
 Found by reading the code on 2026-10-15, not yet reproduced; each gets a regression test before
 its step lands, or is struck from this list:
 
-- A nullfs bind's `..` reaches the source directory's parent, not the mountpoint's.
-- `getcwd` inside a tmpfs or bind mount stops at the mount and returns a truncated path; paths
-  are capped at 32 levels and 256 bytes.
-- `/proc` is matched by literal prefix: inside a chroot it is still reachable, and `/./proc` or a
-  symbolic link to it misses it.
-- Symbolic link targets are cut at 256 bytes.
-- `lseek` on a pipe gives `EBADF`; POSIX wants `ESPIPE`.
-- An open FIFO's inode isn't counted by `oxidebsd_inode_in_use`, so unlinking an open FIFO may let
-  its inode number be reused while the pipe is keyed to it.
+Fixed by step 2b, each with a check in `regress/bin-syscall-smoke/run.sh`: a nullfs bind's `..`
+reached the source directory's parent; `getcwd` inside a tmpfs or bind mount stopped at the mount
+(and paths were capped at 32 levels and 256 bytes); `/proc` was matched by literal prefix, so a
+chroot didn't hide it and `/./proc` or a link to it missed it; symbolic link targets were cut at
+256 bytes. Step 1a made `lseek` on a pipe `ESPIPE`.
+
+Still open, for step 2c: an open FIFO is keyed by its inode number. Since 2b its descriptor
+holds the vnode it was opened through, so the inode isn't freed while the FIFO is open; keying
+the FIFO by vnode is 2c's.
 
 ## 11. Migration
 
@@ -317,7 +317,11 @@ steps.
    it, the VFS's giant lock (**done**: `386e2fe`; the interface types are a crate the kernel and
    the modules share, `lib/libvfs`; `sync(2)` and the unmount at reboot go through the mounts); **2b** the kernel's `namei` and name cache and every path system call
    in the kernel through `vop_*`, the procfs module, oxfs's `resolve_path_impl` and
-   `AT_BASE_OVERRIDE` deleted; **2c** every holder of an inode number moved to vnode references,
+   `AT_BASE_OVERRIDE` deleted (**done**: `80ba24b`; with it plain `nmount`/`unmount`, cwd and root
+   as vnode references, and `f_vnode`; found: a descriptor's `close` ran after it left the table,
+   and a freed inode's number came back with its old vnode still hashed, now recycled when oxfs
+   frees it; `open("")` is `ENOENT`, each mount has its own `st_dev`, root's `X_OK` needs an
+   execute bit, as on the BSDs); **2c** every holder of an inode number moved to vnode references,
    `oxidebsd_inode_in_use` and the orphan sweep deleted; **2d** `getfsstat`, `MNT_FORCE`, deadfs
    and `revoke(2)`. Plain `nmount`/`unmount` and the mount table, and cwd and root as vnodes, go
    with 2b instead: the kernel's `namei` crosses mounts and starts from the cwd (found while
