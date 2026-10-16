@@ -22,7 +22,8 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | An orphan reparented to pid 1 is reaped by the kernel at exit (`Process::adopted`, treated like `SA_NOCLDWAIT`), although `/sbin/init` now reaps with `waitpid(-1, WNOHANG)`. | init reaps orphans | v0.3.0 |
-| `setrlimit` limits are stored, never enforced (only `RLIMIT_MEMLOCK`, for `mlockall(MCL_FUTURE)`). | Enforced | v0.3.0 (the ones that matter: `NOFILE`, `STACK`, `AS`, `CORE`) |
+| `setrlimit` limits are stored, never enforced (only `RLIMIT_MEMLOCK`, for `mlockall(MCL_FUTURE)`, and `RLIMIT_NOFILE`). | Enforced | v0.3.0 (the ones that matter: `STACK`, `AS`, `CORE`) |
+| `setrlimit` accepts a soft limit above the hard one, and lets any user raise a hard limit. | `EINVAL`; raising a hard limit needs privilege | v0.3.0 |
 | `nice`/`setpriority` stored, no effect on scheduling. | Affects scheduling | later |
 | `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` returns an all-zero `struct rusage`. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
@@ -31,7 +32,9 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| oxfs's open-file table is system-wide and fixed-size (`MAX_OPEN_FILES = 2048`). | Per-process tables with `RLIMIT_NOFILE` | v0.3.0 |
+| oxfs keeps its own system-wide open-file table beside the kernel's descriptions (it grows from the heap since 718bdaf), and finding a process's lowest free fd is linear in its open files. | One `struct file` per open (`VFS.md` §6.4), an fd bitmap per process | v0.3.0 (`VFS.md` step 1) |
+| exec opens the program as a descriptor of the calling process, so a process at its `RLIMIT_NOFILE` can't exec (`EMFILE`). | The kernel holds the file without a descriptor | v0.3.0 (`VFS.md` step 1) |
+| Descriptors received with `SCM_RIGHTS` aren't checked against `RLIMIT_NOFILE` (`fd::install_held`). | Refused past the limit (FreeBSD: `EMSGSIZE`, the rights discarded) | v0.3.0 |
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
 | `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing (`link` already fails `EXDEV`). | `EXDEV` across filesystems | v0.3.0 |
 | `/proc` is a special case inside oxfs; no VFS layer. | A VFS with filesystems mounted on it | later |
@@ -70,6 +73,8 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-15 — modules had no heap and no `core::fmt`: `lib/libkern-mod`, charged per module (`kern.module.<name>.alloc`); oxfs's open-file table and `/proc` renders moved to it (`/proc` files were cut at 1 KiB) — 8404fe5, 718bdaf
+- 2026-10-15 — `RLIMIT_NOFILE` wasn't enforced and `kern.maxfiles` was a flat 8192: enforced (`EMFILE`), 1024 soft and `kern.maxfilesperproc` hard, `kern.maxfiles` one per 32 KiB of RAM — 8b280ec
 - 2026-10-15 — BusyBox's `ipcs` and `ipcrm` replaced by native ones over `kern.ipc` sysctls; `security.bsd.see_other_uids` — 34b5b55
 - 2026-10-14 — `vfork` was a plain fork: the child borrows the parent's address space, the parent sleeps until exec or exit (`COW.md` §7) — 9786905, a0f9b73
 - 2026-10-14 — file mappings were filled at `mmap`/exec: demand-paged from the disk (`DEMANDPAGE.md`) — 2183878

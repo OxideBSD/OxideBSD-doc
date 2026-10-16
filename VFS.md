@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
-Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Not
-implemented. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Step 0
+of §11 implemented; steps 1-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -49,17 +49,31 @@ Decided with the user (2026-10-15):
 
 ## 3. Module constraints and what follows from them
 
-3.1. **Modules get a real allocator** (decided 2026-10-15), before any of the VFS (§11 step 0).
-Today a module has no heap and no `core::fmt`; its state is `static mut` or pools taken from
-`oxidebsd_module_alloc_zeroed` in `module_init`. Step 0 adds two kernel exports,
-`oxidebsd_kmalloc(size, align) -> *mut u8` and `oxidebsd_kfree(ptr, size, align)`, over the kernel
-heap, usable at any time a module runs (not only in `module_init`), and a small shared crate,
-`lib/libkmod`, that a module links to get a `#[global_allocator]` over them, so module code uses
-`alloc` (`Box`, `Vec`, `BTreeMap`) as kernel code does. Allocation failure returns null; the
-module's `alloc_error_handler` panics, which is fatal to the call as any module panic is. Every
-allocation a module makes is charged to it (`kern.module.<name>.alloc` sysctl), so a leak is
-visible. Whether `core::fmt` comes with it is decided by what step 0 finds about its size and
-relocations (§11).
+3.1. **Modules get a real allocator** (decided 2026-10-15; implemented, §11 step 0). Before it
+a module had no heap and no `core::fmt`; its state was `static mut` or pools taken from
+`oxidebsd_module_alloc_zeroed` in `module_init`. Two kernel exports,
+`oxidebsd_kmalloc(size, align, id) -> *mut u8` and `oxidebsd_kfree(ptr, size, align, id)`, allocate
+from the kernel heap at any time a module runs (not only in `module_init`), and a small shared
+crate, `lib/libkern-mod` (crate `kern_mod`), gives a module that depends on it a
+`#[global_allocator]` over them, so module code uses `alloc` (`Box`, `Vec`, `BTreeMap`) as kernel
+code does. Allocation failure returns null; through an infallible API that reaches
+`__rust_alloc_error_handler`, which the loader points at a kernel function that is fatal to the
+call, as any module panic is. Code that can fail cleanly uses `try_reserve` and returns `ENOMEM`.
+
+Every allocation a module makes is charged to it: `libkern-mod` defines a `kern_mod_id` static, and
+the loader writes the module's charge id into it after relocation and before `module_init`, so a
+module cannot forget to identify itself (decided 2026-10-15, over FreeBSD-style malloc types and
+over an explicit init call). The charge shows as `kern.module.<name>.alloc` (bytes) and
+`kern.module.<name>.allocs` (allocations), so a leak is visible.
+
+rustc generates its allocator shim only at a final link, which a module never has; the loader
+resolves the two symbols that leaves undefined (`__rust_alloc_error_handler`,
+`__rust_no_alloc_shim_is_unstable_v2`) by suffix, since their mangled names carry a toolchain hash.
+No new relocation types were needed: `Box<dyn Trait>` vtables are `R_X86_64_64` in writable data.
+
+`core::fmt` is allowed in modules (decided 2026-10-15): a heavy `format!` (integers, hex, padding,
+`Debug` of a tuple) measured about 17 KB after `--gc-sections`, with only relocation types the
+loader already applies.
 
 Still, the VFS keeps the kernel's own objects kernel-allocated: a type declares the size of its
 per-mount private data (`mnt_data`) and per-vnode private data (`v_data`); the kernel allocates
@@ -227,8 +241,12 @@ its step lands, or is struck from this list:
 Each step is its own commits; the suite and the POSIX canary stay at their baseline between
 steps.
 
-0. **A module allocator** (§3.1): `oxidebsd_kmalloc`/`kfree`, `lib/libkmod`, then oxfs's fixed
-   pools (`OPEN_FILES`, `PROC_RENDERS`, ...) moved to the heap as the first user.
+0. **A module allocator** (§3.1): `oxidebsd_kmalloc`/`kfree`, `lib/libkern-mod`, then oxfs's fixed
+   pools (`OPEN_FILES`, `PROC_RENDERS`) moved to the heap as the first user. **Done**: `8404fe5`
+   (allocator, `tests/kmod_alloc_syscall_smoke`), `718bdaf` (oxfs: its resident data and bss
+   went from 986,655 to 134,483 bytes; `/proc` files are no longer cut at 1 KiB), and `8b280ec`
+   (`RLIMIT_NOFILE` enforced and `kern.maxfiles` sized from RAM, which oxfs's fixed table had
+   stood in for).
 1. **Descriptors and block devices.** `struct file` and `fileops` (§6.4-6.5); the kernel's
    `close`/`lseek`/`fstat`/`ioctl`/`ftruncate`/`fsync`; the block device interface (§8.2) and the
    shared buffer cache (§7.4), oxfs moved onto it and `bcache.rs` deleted. Files are still named
@@ -261,3 +279,7 @@ code.
 2026-10-15 (user, on review): modules get a real allocator (not per-mount kernel allocation
 only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
 cache for a shared one.
+
+2026-10-15 (user, step 0): module allocations are charged per module through a loader-stamped id;
+`core::fmt` is allowed in modules; the support crate is `lib/libkern-mod` (not `libkmod`, which on
+Linux names the userland module library).

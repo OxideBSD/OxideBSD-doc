@@ -93,11 +93,14 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `kern.hz` | int | read | the clock-interrupt rate, 100 |
 | `kern.clockrate` | `S,clockinfo` | read | `hz`, `tick`, `profhz`, `stathz` |
 | `kern.maxproc` | int | tunable | process table limit |
-| `kern.maxfiles` | int | tunable | open-file limit |
+| `kern.maxfiles` | int | tunable | open-file limit; by default one per 32 KiB of RAM, at least 512 (2048 at 64 MB) |
+| `kern.maxfilesperproc` | int | read-write, tunable | a process's own limit, which `RLIMIT_NOFILE` can't exceed; by default 9/10 of `kern.maxfiles` |
 | `kern.argmax` | int | read | `execve(2)` argument limit (2 MiB) |
 | `kern.ngroups` | int | read | supplementary group limit |
 | `kern.iov_max` | int | read | 1024 |
 | `kern.msgbuf` | string | read | the kernel message buffer (`SYSLOG.md` §3) |
+| `kern.module.<name>.alloc` | ulong | read | bytes module `<name>` holds from the kernel heap (`VFS.md` §3.1) |
+| `kern.module.<name>.allocs` | ulong | read | allocations module `<name>` holds from the kernel heap |
 | `kern.msgbufsize` | int | tunable | its size, 65536 |
 | `kern.msgbuf_clear` | int | write | any value empties the buffer |
 | `hw.machine` | string | read | the port: `amd64` (§5.1) |
@@ -167,7 +170,8 @@ names a tunable sets it. A token that names no tunable, or a value out of range,
 ignored. The command line's other tokens (`-s`, `-D`, `-h`, `no-ata`, `console.underline=`) are
 unchanged.
 
-6.3. Initial tunables: `kern.msgbufsize` (4096 to 16 MiB), `kern.maxproc` and `kern.maxfiles`.
+6.3. Initial tunables: `kern.msgbufsize` (4096 to 16 MiB), `kern.maxproc`, `kern.maxfiles` and
+`kern.maxfilesperproc`.
 
 6.4. `kern.hz` stays read-only: the scheduler's quantum and every tick-based timeout assume 100.
 
