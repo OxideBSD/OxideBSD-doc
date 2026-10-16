@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
 Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0
-and 1a of §11 implemented; 1b and 2-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+and 1 of §11 implemented; 2-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -182,18 +182,25 @@ not by oxfs inode number, so two file systems never collide.
 
 7.2. Demand paging (`DEMANDPAGE.md`) keeps filling pages without going through the file system's
 read path: the file system's `vop_bmap` maps a file block to a **device** block, and the fill
-reads that device through §8.2's block interface. Today's `CONTENT_BLOCK_MAP` callback and the
-direct `oxidebsd_block_read` on the root partition (`pagecache.rs`) go away. A file system with
+reads that device through §8.2's block interface (since step 1b the fill reads the root's
+`vfs_bdev` handle; the `CONTENT_BLOCK_MAP` callback goes with step 2). A file system with
 no block device (tmpfs, procfs) fills through `vop_read`, as tmpfs does today.
 
 7.3. `content_changed` becomes the VFS's own invalidation on `vop_write`, `vop_setattr` (size)
 and reclaim; file systems no longer call it.
 
-7.4. **A shared buffer cache** (decided 2026-10-15): the kernel gets FreeBSD's `buf` layer in
-miniature (`sys/kern/vfs_bio.rs`): `bread(dev, blkno, size)`, `bwrite`, `bdwrite` (delayed),
-`bawrite`, `brelse`, per-device, sized from RAM, with the delayed-write ordering and the clean
-flag that oxfs's `bcache.rs` does today (`RAM_FLOOR.md` §3.2-3.3). oxfs drops `bcache.rs` and uses
-it; msdosfs uses it from the start. `update(8)`'s 30-second flush becomes `sync(2)` through it.
+7.4. **A shared buffer cache** (decided 2026-10-15, done in step 1b): FreeBSD's `buf` layer in
+miniature (`sys/kern/vfs_bio.rs`): `bread(dev, blkno, size, ahead)`, `getblk`, `bwrite`,
+`bdwrite` (delayed), `brelse`, `bflush`, `bdiscard`, `binval`, `binvalall`, for every block
+device. A buffer is `(device, block in sectors, size)`, the size a whole number of sectors up to
+`MAXBSIZE` (64 KiB); a file system never reads overlapping buffers of different sizes. Each
+buffer owns a 64 KiB slot of a kernel window (level-4 slot 387) with only the pages its size
+needs mapped, within a budget of `RAM / 8` (2-512 MiB). The write ordering is the file
+system's, through a pre-write hook it sets for its device (FreeBSD's `bioops` shape): the cache
+calls it before any dirty buffer goes to the disk, and it writes what that buffer depends on
+first; its answer says whether the buffer may share a disk command with its neighbours. oxfs's
+`bcache.rs` is gone: its block kinds are tags and its ordering rules its hook (`src/buf.rs`); the
+clean flag stays oxfs's. msdosfs uses it from the start. `update(8)`'s 30-second flush becomes `sync(2)` through it.
 Data blocks a file has mapped are in the page cache, metadata in the buffer cache; a block is
 never in both writable at once (FreeBSD's rule before its unified cache).
 
@@ -204,11 +211,14 @@ each its own module, split out of oxfs (§11 step 3). devfs keeps building its t
 kernel's device registry (`DEVFS.md`); tmpfs instances each get their own pool and their own
 `f_fsid`/`st_dev` (today all tmpfs mounts and devfs share device 2); `/dev/shm` stays a tmpfs.
 
-8.2. **Block devices for file systems.** A mount names its device by path (`from=/dev/gpt/efi`).
-The kernel opens it as a `struct file` (no fd) and gives the file system a handle with
-`oxidebsd_bdev_read(handle, block, count, buf)` / `write` / `size` / `sector_size`, bounded to the
-partition, in device blocks. Today's `oxidebsd_block_*`, hard-wired to the root partition, become
-this. Two file systems on two partitions of one disk (the ESP and the root) are the case to test.
+8.2. **Block devices for file systems** (done in step 1b, `sys/kern/vfs_bdev.rs`). Every disk,
+partition, GPT label and the memory disk is a handle bounded to its extent, read and written in
+512-byte sectors (`oxidebsd_bdev_read(handle, sector, count, buf)`, `_write`, `_sectors`); the
+drivers take sectors. The root's handle is chosen at boot (`/boot/fsconf`); from step 2 a mount
+names its device by path (`from=/dev/gpt/efi`), which the kernel resolves to its handle. Raw
+`/dev` nodes are uncached, as FreeBSD's, and a raw write to a device overlapping one a file
+system has mounted read-write is refused. Two file systems on two partitions of one disk (the
+ESP and the root) are the case to test, with msdosfs (step 4).
 
 8.3. procfs answers `/proc` as a mount, so it obeys chroot and every spelling of the path
 (today `/./proc` misses it, and a chroot doesn't hide it).
@@ -265,7 +275,10 @@ steps.
    `7a0f930` (oxfs moved, the per-descriptor callbacks deleted), `d134d8a` (the `vfs` module and
    the kernel's descriptor calls, `ioctl`/`poll` through the table; found: `ftruncate` through a
    read-only descriptor truncated the file), `af2d000` (exec reads a kernel-held file, so a
-   process at its `RLIMIT_NOFILE` can exec). **1b**, block devices and the buffer cache, next.
+   process at its `RLIMIT_NOFILE` can exec). **1b, block devices and the buffer cache, done**:
+   `22ec7bb` (`vfs_bdev`, sector-granular drivers), `ebb8540` (`vfs_bio`, oxfs on it,
+   `bcache.rs` and `oxidebsd_block_*` deleted; found: the boot frame allocator couldn't free a
+   frame before every module had loaded).
 2. **Vnodes and `namei`.** `struct mount`, `vfsops`, vnodes, the kernel's `namei` and name cache,
    `nmount`/`unmount`, `getdents` through `vop_readdir`, the one giant lock (§5.4); oxfs
    reimplemented as the `oxfs` type, still holding tmpfs, devfs and `/proc` inside it; cwd, root,
@@ -294,6 +307,10 @@ code.
 2026-10-15 (user, on review): modules get a real allocator (not per-mount kernel allocation
 only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
 cache for a shared one.
+
+2026-10-16 (user, step 1b): the buffer cache keeps a file system's crash ordering through a
+pre-write dependency hook per device (FreeBSD's `bioops`/soft-updates shape), over ordered write
+classes or synchronous metadata.
 
 2026-10-15 (user, step 1): step 1 lands as 1a (descriptors) then 1b (block devices and the
 buffer cache), the suite and the canary green between; a module describes a kind of file with a
