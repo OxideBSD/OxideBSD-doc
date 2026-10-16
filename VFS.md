@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
-Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Step 0
-of §11 implemented; steps 1-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0
+and 1a of §11 implemented; 1b and 2-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -153,17 +153,27 @@ purged by `remove`, `rename` and `rmdir`, and per mount at unmount.
 6.3. A process's cwd and root become vnode references in `ThreadGroupShared`. The synthetic
 `/proc` cwd encoding (bit 63) goes away: `/proc` is a mount (§8.3).
 
-6.4. `struct file` replaces today's `Description`: type (`DTYPE_VNODE`, `DTYPE_PIPE`,
-`DTYPE_FIFO`, `DTYPE_SOCKET`, `DTYPE_PTS`, ...), `fileops` (`read`, `write`, `ioctl`, `poll`,
-`stat`, `close`, `truncate`, `seek`), the offset, open flags (`O_APPEND`, `O_NONBLOCK`, access
-mode), and the object (a vnode, pipe, socket). `close`, `lseek`, `fstat`, `ioctl`, `ftruncate`,
-`fsync` and `getdents` become kernel calls through `fileops`/vnode operations for every
-descriptor type; `lseek` on a pipe or socket gives `ESPIPE` (POSIX; today `EBADF`). The
-hard-coded `ioctl` chain becomes the descriptor's `ioctl` operation.
+6.4. `struct file` replaces the old `Description` (done, §11 step 1a): one static `#[repr(C)]`
+`FileOps` table per kind of file (`read`, `write`, `close`, `ioctl`, `poll`, `stat`,
+`truncate`, `sync`, and `content_id`/`fb_geometry` for `mmap`; a null entry takes the kernel's
+default), the object (`data`), `f_flag` (`FREAD`, `FWRITE`, `O_APPEND`, `O_NONBLOCK`, made from
+`open(2)`'s flags as FreeBSD's `FFLAGS` does), and the offset. There is no `seek` operation: a
+table marked `DFLAG_SEEKABLE` has the kernel keep the offset, passing it in the uio
+(`FOF_NEXTOFF`, or `FOF_OFFSET` for `pread`/`pwrite`) and storing it back. The kernel checks the
+access mode before `read`/`write` (`EBADF`). `close`, `lseek`, `fstat`, `ioctl`, `ftruncate`,
+`fsync` and `fdatasync` are kernel calls through the table for every descriptor type (the `vfs`
+module registers them); `lseek` on a pipe or socket gives `ESPIPE`, `ftruncate`/`fsync` on one
+`EINVAL`, as POSIX has them. The hard-coded `ioctl` and `poll` chains became each type's
+operations. Still to come: `getdents` moves with `vop_readdir` (step 2), and `fstat` of a file
+whose table has no `stat` (FIFOs, terminals, devices) is answered by oxfs's registered fallback
+until devfs is split out (step 3). The `DTYPE_*` type isn't a field yet: the old `FdKind` tag
+serves `/proc/<pid>/fd` links until vnodes name files.
 
 6.5. The fd table itself (`(tgid, fd) -> struct file`, lowest free number, `FD_CLOEXEC`, fork
 inheritance, `SCM_RIGHTS`) stays as `sys/fs/fd.rs` has it, now holding `struct file`
-references; the kernel may hold a `struct file` with no fd (exec's open, a mount's device).
+references; the kernel may hold a `struct file` with no fd (exec's open, a mount's device):
+`fd::kernel_open` runs a file system's open so that the file it makes is held, not installed
+(done for exec, §11 step 1a).
 
 ## 7. Page cache and demand paging
 
@@ -250,7 +260,12 @@ steps.
 1. **Descriptors and block devices.** `struct file` and `fileops` (§6.4-6.5); the kernel's
    `close`/`lseek`/`fstat`/`ioctl`/`ftruncate`/`fsync`; the block device interface (§8.2) and the
    shared buffer cache (§7.4), oxfs moved onto it and `bcache.rs` deleted. Files are still named
-   by oxfs inode numbers.
+   by oxfs inode numbers. Split in two (decided 2026-10-15): **1a, descriptors, done**: `0ee960f`
+   (`FileOps`, kernel-kept flags and offset, the kernel's own descriptor types moved),
+   `7a0f930` (oxfs moved, the per-descriptor callbacks deleted), `d134d8a` (the `vfs` module and
+   the kernel's descriptor calls, `ioctl`/`poll` through the table; found: `ftruncate` through a
+   read-only descriptor truncated the file), `af2d000` (exec reads a kernel-held file, so a
+   process at its `RLIMIT_NOFILE` can exec). **1b**, block devices and the buffer cache, next.
 2. **Vnodes and `namei`.** `struct mount`, `vfsops`, vnodes, the kernel's `namei` and name cache,
    `nmount`/`unmount`, `getdents` through `vop_readdir`, the one giant lock (§5.4); oxfs
    reimplemented as the `oxfs` type, still holding tmpfs, devfs and `/proc` inside it; cwd, root,
@@ -279,6 +294,13 @@ code.
 2026-10-15 (user, on review): modules get a real allocator (not per-mount kernel allocation
 only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
 cache for a shared one.
+
+2026-10-15 (user, step 1): step 1 lands as 1a (descriptors) then 1b (block devices and the
+buffer cache), the suite and the canary green between; a module describes a kind of file with a
+static `FileOps` table (FreeBSD's `fileops`), not per-descriptor callbacks; the descriptor calls
+are registered by a new module named `vfs`; the buffer cache has variable-size buffers
+(FreeBSD's `bread(dev, blkno, size)`; a file system never reads overlapping buffers of different
+sizes).
 
 2026-10-15 (user, step 0): module allocations are charged per module through a loader-stamped id;
 `core::fmt` is allowed in modules; the support crate is `lib/libkern-mod` (not `libkmod`, which on

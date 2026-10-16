@@ -33,7 +33,7 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | oxfs keeps its own system-wide open-file table beside the kernel's descriptions (it grows from the heap since 718bdaf), and finding a process's lowest free fd is linear in its open files. | One `struct file` per open (`VFS.md` §6.4), an fd bitmap per process | v0.3.0 (`VFS.md` step 1) |
-| exec opens the program as a descriptor of the calling process, so a process at its `RLIMIT_NOFILE` can't exec (`EMFILE`). | The kernel holds the file without a descriptor | v0.3.0 (`VFS.md` step 1) |
+| `fstat` of a FIFO, terminal or device is answered by oxfs (its node), as the kernel's stat fallback. | devfs and FIFOs as vnodes answer for themselves | v0.3.0 (`VFS.md` steps 2-3) |
 | Descriptors received with `SCM_RIGHTS` aren't checked against `RLIMIT_NOFILE` (`fd::install_held`). | Refused past the limit (FreeBSD: `EMSGSIZE`, the rights discarded) | v0.3.0 |
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
 | `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing (`link` already fails `EXDEV`). | `EXDEV` across filesystems | v0.3.0 |
@@ -73,6 +73,8 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-16 — the descriptor calls (`close`, `lseek`, `fstat`, `ftruncate`, `fsync`, `fdatasync`) were oxfs's and misanswered other descriptors (`lseek`/`ftruncate` on a pipe `EBADF`), `ioctl` and `poll` were hard-coded chains of type checks, each backend checked its own access mode (`ftruncate` through a read-only descriptor truncated): `struct file` with static `FileOps` tables, the kernel keeping the flags and offset (`VFS.md` step 1a) — 0ee960f, 7a0f930, d134d8a
+- 2026-10-16 — exec opened the program as a descriptor of the caller, so a process at its `RLIMIT_NOFILE` couldn't exec: a kernel-held file (`fd::kernel_open`) — af2d000
 - 2026-10-15 — modules had no heap and no `core::fmt`: `lib/libkern-mod`, charged per module (`kern.module.<name>.alloc`); oxfs's open-file table and `/proc` renders moved to it (`/proc` files were cut at 1 KiB) — 8404fe5, 718bdaf
 - 2026-10-15 — `RLIMIT_NOFILE` wasn't enforced and `kern.maxfiles` was a flat 8192: enforced (`EMFILE`), 1024 soft and `kern.maxfilesperproc` hard, `kern.maxfiles` one per 32 KiB of RAM — 8b280ec
 - 2026-10-15 — BusyBox's `ipcs` and `ipcrm` replaced by native ones over `kern.ipc` sysctls; `security.bsd.see_other_uids` — 34b5b55
