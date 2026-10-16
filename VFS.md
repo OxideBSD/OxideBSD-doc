@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
 Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0
-and 1 of §11 implemented; 2-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+and 1 of §11 implemented, step 2 in progress (2a done); 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -314,11 +314,14 @@ steps.
    to vnodes; `oxidebsd_inode_in_use` deleted; forced unmount, deadfs, `revoke(2)` and
    `getfsstat(2)`. The biggest step, landed in four parts (decided 2026-10-16), the suite green
    after each: **2a** mounts and vnodes, oxfs registered as a type and the root mounted through
-   it, the VFS's giant lock; **2b** the kernel's `namei` and name cache and every path system call
+   it, the VFS's giant lock (**done**: `386e2fe`; the interface types are a crate the kernel and
+   the modules share, `lib/libvfs`; `sync(2)` and the unmount at reboot go through the mounts); **2b** the kernel's `namei` and name cache and every path system call
    in the kernel through `vop_*`, the procfs module, oxfs's `resolve_path_impl` and
    `AT_BASE_OVERRIDE` deleted; **2c** every holder of an inode number moved to vnode references,
-   `oxidebsd_inode_in_use` and the orphan sweep deleted; **2d** `nmount`/`unmount`/`getfsstat` in
-   the kernel, the mount table out of oxfs, `MNT_FORCE`, deadfs and `revoke(2)`.
+   `oxidebsd_inode_in_use` and the orphan sweep deleted; **2d** `getfsstat`, `MNT_FORCE`, deadfs
+   and `revoke(2)`. Plain `nmount`/`unmount` and the mount table, and cwd and root as vnodes, go
+   with 2b instead: the kernel's `namei` crosses mounts and starts from the cwd (found while
+   planning 2b).
 3. **Split out** tmpfs, devfs and nullfs as their own types and modules.
 4. **msdosfs** (§9), the kernel's time zone offset; `/boot/efi` in `fstab` on systems with an ESP.
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
