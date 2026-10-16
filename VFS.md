@@ -110,7 +110,16 @@ continues at `..` of the covered vnode (FreeBSD's `VV_ROOT` handling). This fixe
 
 4.4. Unmount fails with `EBUSY` while a vnode of the mount is referenced (by a descriptor, a cwd
 or root, a mapping, a mount on top of it), unless `MNT_FORCE`, which revokes descriptors (`VOP_REVOKE`
-to a dead vnode, `deadfs`).
+to a dead vnode, `deadfs`: its reads give end of file, everything else `EBADF`/`EIO` as FreeBSD's
+`dead_vnodeops`). Forced unmount and deadfs land in step 2 (decided 2026-10-16), and with them
+`revoke(2)` (all three BSDs have it; `getty`/`login` use it to take a terminal from an old
+session): it revokes every descriptor opened through the named vnode, and for a device every
+descriptor of that device. A descriptor remembers the vnode it was opened through (`f_vnode`), even
+when its operations are a device's or a FIFO's.
+
+4.6. `getfsstat(2)` (FreeBSD's shape, an OxideBSD number; decided 2026-10-16) lists the mounts
+as `struct statfs` records; `mount(8)` and `df(1)` use it, and procfs renders `/proc/mounts` from
+the same kernel list.
 
 4.5. Per-mount read-only: `MNT_RDONLY` on any mount, and `MNT_UPDATE` to change it, replace the
 root-only `ROOT_RDONLY` flag. `EROFS` is decided by the VFS for every modifying operation before
@@ -127,7 +136,24 @@ vnode.
 5.2. Vnode operations (the subset this system needs, FreeBSD's names): `lookup`, `create`,
 `mknod`, `open`, `close`, `access`, `getattr`, `setattr`, `read`, `write`, `ioctl`, `poll`,
 `fsync`, `remove`, `link`, `rename`, `mkdir`, `rmdir`, `symlink`, `readdir`, `readlink`,
-`inactive`, `reclaim`, `bmap`, `strategy` (later), `pathconf`, `advlock`, `getpages` (later).
+`inactive`, `reclaim`, `bmap`, `strategy` (later), `pathconf`, `advlock`, `revoke`, `getpages`
+(later).
+
+The vector is a positional `#[repr(C)]` table, one `extern "C"` function per operation taking
+plain arguments (`lookup(dvp, cnp, vpp)`, `read(vp, uio, ioflag)`), not FreeBSD's one-struct
+`vop_xxx_args` with an `a_desc` header (decided 2026-10-16): simpler from Rust, at the cost of
+nullfs writing a forwarder per operation instead of one `vop_bypass`.
+
+`getattr` fills, and `setattr` takes, a kernel-defined `struct vattr` in FreeBSD's shape (type,
+mode, nlink, uid, gid, fsid, fileid, size, blocksize, times, rdev, bytes, flags; `VNOVAL` for a
+field `setattr` leaves alone); the kernel makes `stat(2)`'s record from it, so no file system
+knows the userland ABI's layout (decided 2026-10-16).
+
+Permission checks are the file system's `access`, which normally calls the kernel's
+`vaccess(type, mode, uid, gid, want, cred)` with the file's attributes (msdosfs with its mount's
+`-u`/`-g`/`-m`, procfs with its own), FreeBSD's split (decided 2026-10-16). `namei` asks for
+`VEXEC` on every directory it searches; the VFS asks before every operation that needs a
+permission, as FreeBSD's system call layer does.
 
 5.3. Life cycle: a vnode with use count 0 is inactive (`vop_inactive` lets the file system free
 an unlinked file's storage: this replaces `oxidebsd_inode_in_use` and oxfs's orphan sweep); an
@@ -220,7 +246,9 @@ names its device by path (`from=/dev/gpt/efi`), which the kernel resolves to its
 system has mounted read-write is refused. Two file systems on two partitions of one disk (the
 ESP and the root) are the case to test, with msdosfs (step 4).
 
-8.3. procfs answers `/proc` as a mount, so it obeys chroot and every spelling of the path
+8.3. procfs answers `/proc` as a mount, its own module from step 2 (decided 2026-10-16:
+the synthetic `/proc` cwd goes with step 2, and procfs uses only the kernel's process accessors,
+never oxfs's storage, so it moves once instead of twice), so it obeys chroot and every spelling of the path
 (today `/./proc` misses it, and a chroot doesn't hide it).
 
 ## 9. msdosfs
@@ -281,10 +309,17 @@ steps.
    frame before every module had loaded).
 2. **Vnodes and `namei`.** `struct mount`, `vfsops`, vnodes, the kernel's `namei` and name cache,
    `nmount`/`unmount`, `getdents` through `vop_readdir`, the one giant lock (§5.4); oxfs
-   reimplemented as the `oxfs` type, still holding tmpfs, devfs and `/proc` inside it; cwd, root,
-   the page cache (§7) and every other kernel holder of an inode number moved to vnodes;
-   `oxidebsd_inode_in_use` deleted. The biggest step.
-3. **Split out** tmpfs, devfs, procfs and nullfs as their own types and modules.
+   reimplemented as the `oxfs` type, still holding tmpfs and devfs inside it; procfs its own
+   module; cwd, root, the page cache (§7) and every other kernel holder of an inode number moved
+   to vnodes; `oxidebsd_inode_in_use` deleted; forced unmount, deadfs, `revoke(2)` and
+   `getfsstat(2)`. The biggest step, landed in four parts (decided 2026-10-16), the suite green
+   after each: **2a** mounts and vnodes, oxfs registered as a type and the root mounted through
+   it, the VFS's giant lock; **2b** the kernel's `namei` and name cache and every path system call
+   in the kernel through `vop_*`, the procfs module, oxfs's `resolve_path_impl` and
+   `AT_BASE_OVERRIDE` deleted; **2c** every holder of an inode number moved to vnode references,
+   `oxidebsd_inode_in_use` and the orphan sweep deleted; **2d** `nmount`/`unmount`/`getfsstat` in
+   the kernel, the mount table out of oxfs, `MNT_FORCE`, deadfs and `revoke(2)`.
+3. **Split out** tmpfs, devfs and nullfs as their own types and modules.
 4. **msdosfs** (§9), the kernel's time zone offset; `/boot/efi` in `fstab` on systems with an ESP.
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
 6. **Per-vnode locks** with SMP (v0.5.0).
@@ -307,6 +342,11 @@ code.
 2026-10-15 (user, on review): modules get a real allocator (not per-mount kernel allocation
 only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
 cache for a shared one.
+
+2026-10-16 (user, step 2): vnode operations are a positional table, not args structs; procfs
+becomes its own module in step 2; permission checks are FreeBSD's (`vop_access` calling the
+kernel's `vaccess`); forced unmount, deadfs and `revoke(2)` in step 2; `getfsstat(2)` plus
+`/proc/mounts`; `getattr` fills a FreeBSD-style `struct vattr`; step 2 lands as 2a-2d.
 
 2026-10-16 (user, step 1b): the buffer cache keeps a file system's crash ordering through a
 pre-write dependency hook per device (FreeBSD's `bioops`/soft-updates shape), over ordered write
