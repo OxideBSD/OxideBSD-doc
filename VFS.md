@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
-Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0-3
-of §11 implemented, step 4 in progress (4a-4c done); 5-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0-4
+of §11 implemented; 5-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -344,8 +344,8 @@ steps.
    In five parts (decided 2026-10-17): **4a** `kern.utc_offset` and `adjkerntz(8)` (**done**:
    `8226d84`); **4b** the FAT tools: `fsck_msdosfs`, `newfs_msdos`, `makefs -o fat_type=`, code
    pages (**done**: `a965603`); **4c** the msdosfs module, read-only, and mounts from a disk device
-   (**done**: `a61f667`); **4d** writing and `mount_msdosfs`'s options; **4e** `/boot/efi` on
-   disks with an ESP.
+   (**done**: `a61f667`); **4d** writing and `mount_msdosfs`'s options (**done**: `060b108`); **4e** `/boot/efi` on
+   disks with an ESP (**done**: `784d11b`).
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
 6. **Per-vnode locks** with SMP (v0.5.0).
 

@@ -67,6 +67,8 @@ fix lands, the row moves to §8 with its commit.
 | The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
 | The `libc` crate fork's `struct statvfs` is Linux musl's (no `f_type`; and since VFS step 2d, none of the mount names OxideBSD's musl adds), so a Rust crate calling `libc::statvfs` gets a short buffer filled long. No Rust code here calls it. | The struct matches musl's | v0.3.0 |
 | Only `passwd(1)` changes `/etc/master.passwd` and `/etc/passwd` (through `pam_unix`); no tool adds or removes users or groups (`adduser`, `pw`, `vipw`). | They can | v0.3.0 |
+| `touch(1)` (`bin/touch`) takes only `-c`: `-t`, `-d`, `-r`, `-a`, `-m` are missing, and an unknown flag is taken for a file name (`touch -t 2020... f` makes a file `-t`'s argument names). Found while testing msdosfs (VFS step 4d). | POSIX's flags; unknown ones refused | v0.3.0 |
+| msdosfs keeps out of the name cache (`VFCF_NOCACHE`): a case-insensitive lookup would cache the case the caller used, and `getcwd` reports it. Every msdosfs lookup reads the directory. | The cache folds case for such mounts | v0.4.0 |
 
 ## 8. History
 
