@@ -32,12 +32,10 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| oxfs keeps its own system-wide open-file table beside the kernel's descriptions (it grows from the heap since 718bdaf), and finding a process's lowest free fd is linear in its open files. | One `struct file` per open (`VFS.md` §6.4), an fd bitmap per process | v0.3.0 (`VFS.md` step 1) |
-| `fstat` of a FIFO, terminal or device is answered by oxfs (its node), as the kernel's stat fallback. | devfs and FIFOs as vnodes answer for themselves | v0.3.0 (`VFS.md` steps 2-3) |
+| Finding a process's lowest free fd is linear in its open files. | An fd bitmap per process | v0.3.0 |
 | Descriptors received with `SCM_RIGHTS` aren't checked against `RLIMIT_NOFILE` (`fd::install_held`). | Refused past the limit (FreeBSD: `EMSGSIZE`, the rights discarded) | v0.3.0 |
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
-| `rename` between the tmpfs pool and the real filesystem moves the entry instead of failing (`link` already fails `EXDEV`). | `EXDEV` across filesystems | v0.3.0 |
-| `/proc` is a special case inside oxfs; no VFS layer. | A VFS with filesystems mounted on it | later |
+| devfs has no rulesets: every view shows every device. | FreeBSD's `devfs(8)`/`devfs.rules(5)`, per-view hide and unhide | with jails |
 | `reboot(2)` always writes delayed blocks (its Linux magic numbers carry no `RB_NOSYNC`), so `reboot -q -n` syncs anyway. | `RB_NOSYNC` honoured | later |
 | Disk writes from mapping, exec, close and other non-syscall paths into oxfs still poll the disk with interrupts masked (`fslock::Guard::for_call`); only syscall dispatch and descriptor reads and writes sleep. | Every path sleeps | v0.5.0 (SMP rework) |
 | One data disk, found once at boot; the memory disk has no `/dev` node. | A block layer with every disk | later |
@@ -73,6 +71,9 @@ fix lands, the row moves to §8 with its commit.
 ## 8. History
 
 Removed shortcuts, as `date — item — commit`.
+
+- 2026-10-17 — tmpfs, devfs and `/dev/shm` were oxfs's: one memory pool for every tmpfs mount and devfs (one `st_dev`, `rename` between it and the disk moved the entry instead of `EXDEV`), the memory devices oxfs's descriptors: tmpfs and devfs modules of their own, the devices the kernel's, `/dev/shm` a tmpfs from `fstab` (`VFS.md` steps 3a-3c) — 338d6d0, fe0e363, a27ca0d
+- 2026-10-16 — `/proc` was matched by path prefix inside oxfs, `fstat` of FIFOs, terminals and devices answered by oxfs's nodes, oxfs kept its own open-file table: the kernel's VFS (`VFS.md` step 2) — 80ba24b, dcf4f5d
 
 - 2026-10-16 — the descriptor calls (`close`, `lseek`, `fstat`, `ftruncate`, `fsync`, `fdatasync`) were oxfs's and misanswered other descriptors (`lseek`/`ftruncate` on a pipe `EBADF`), `ioctl` and `poll` were hard-coded chains of type checks, each backend checked its own access mode (`ftruncate` through a read-only descriptor truncated): `struct file` with static `FileOps` tables, the kernel keeping the flags and offset (`VFS.md` step 1a) — 0ee960f, 7a0f930, d134d8a
 - 2026-10-16 — exec opened the program as a descriptor of the caller, so a process at its `RLIMIT_NOFILE` couldn't exec: a kernel-held file (`fd::kernel_open`) — af2d000
