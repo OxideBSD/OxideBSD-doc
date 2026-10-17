@@ -350,6 +350,12 @@ code.
 only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
 cache for a shared one.
 
+2026-10-16 (user, step 2c): a nullfs vnode records the lower vnode of the same file, and the page
+cache, mappings, FIFOs and sockets key by that one (FreeBSD's nullfs shares the lower vnode's vm
+object); a page cache entry nobody maps only holds its vnode's memory (an unlinked file is freed
+once nothing uses it), while mappings and running programs hold use references; opening a running
+program for writing, or running a file open for writing, fails with `ETXTBSY`, as on the BSDs.
+
 2026-10-16 (user, step 2): vnode operations are a positional table, not args structs; procfs
 becomes its own module in step 2; permission checks are FreeBSD's (`vop_access` calling the
 kernel's `vaccess`); forced unmount, deadfs and `revoke(2)` in step 2; `getfsstat(2)` plus
