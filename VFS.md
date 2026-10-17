@@ -343,6 +343,19 @@ None left from the review. New ones go here as steps uncover them.
 
 ## 13. Decisions
 
+2026-10-17 (user, step 3): step 3 lands as 3a (the devices oxfs implemented, `null`, `zero`,
+`random`, `urandom` and `fb0`, move into the kernel proper, and modules get the kernel's vnode
+operation calls), 3b (tmpfs), 3c (devfs) and 3d (nullfs layered over any type; oxfs left a disk
+file system only), the suite and the canary green after each. tmpfs is a fresh in-memory file
+system in FreeBSD's `tmpfs_node` shape, not oxfs's disk layout in memory; it takes
+`mount_tmpfs`'s `size`, `nodes`, `maxfilesize`, `mode`, `uid` and `gid`, a mount without `size`
+is limited to RAM/16 clamped to 8-64 MiB, `mount -u -o size=` resizes it, and every tmpfs refuses
+to grow past `vfs.tmpfs.memory_reserved` of free memory (FreeBSD's knob); `/sbin/mount_tmpfs` is
+a link to `mount`. devfs follows FreeBSD's (directories, symbolic links, `chmod`/`chown` and
+removing a node last until reboot; no regular files, no `mknod`; any number of mounts, each its
+own view), rulesets later. `/dev/shm` is a tmpfs the default `fstab` mounts, not the kernel;
+tests that use it mount it through one shared helper. nullfs is FreeBSD's, over any type.
+
 2026-10-15 (user): BSD vnodes; file systems as modules (over file systems in the kernel proper,
 and over giving modules an allocator first); staged migration, suite green at each step; msdosfs
 generic and read-write with `mount_msdosfs` semantics; this specification to be reviewed before any
