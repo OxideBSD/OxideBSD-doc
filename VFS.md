@@ -117,9 +117,9 @@ session): it revokes every descriptor opened through the named vnode, and for a 
 descriptor of that device. A descriptor remembers the vnode it was opened through (`f_vnode`), even
 when its operations are a device's or a FIFO's.
 
-4.6. `getfsstat(2)` (FreeBSD's shape, an OxideBSD number; decided 2026-10-16) lists the mounts
-as `struct statfs` records; `mount(8)` and `df(1)` use it, and procfs renders `/proc/mounts` from
-the same kernel list.
+4.6. `getvfsstat(2)` (NetBSD's shape, an OxideBSD number; decided 2026-10-16, §13) lists the
+mounts as `struct statvfs` records with their names; `mount(8)` uses it, and procfs renders
+`/proc/mounts` from the same kernel list.
 
 4.5. Per-mount read-only: `MNT_RDONLY` on any mount, and `MNT_UPDATE` to change it, replace the
 root-only `ROOT_RDONLY` flag. `EROFS` is decided by the VFS for every modifying operation before
@@ -351,6 +351,13 @@ code.
 2026-10-15 (user, on review): modules get a real allocator (not per-mount kernel allocation
 only); vnode locks with SMP, not before; msdosfs times are local time; oxfs drops its own buffer
 cache for a shared one.
+
+2026-10-16 (user, step 2d): mounts are listed by NetBSD's `getvfsstat(2)`, filling a `struct
+statvfs` extended with `f_fstypename`, `f_mntonname` and `f_mntfromname` (POSIX allows extra
+members; `statvfs(3)` fills them too), not FreeBSD's `getfsstat`, since musl's `struct statfs` is
+Linux's; `revoke(2)` takes any file, as NetBSD's; a forced unmount sends every vnode of the mount
+to deadfs, FreeBSD's way (descriptors at end of file or failing, a cwd there finding nothing,
+pages never loaded faulting `SIGBUS`).
 
 2026-10-16 (user, step 2c): a nullfs vnode records the lower vnode of the same file, and the page
 cache, mappings, FIFOs and sockets key by that one (FreeBSD's nullfs shares the lower vnode's vm
