@@ -67,6 +67,7 @@ fix lands, the row moves to §8 with its commit.
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
 | After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
 | The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
+| The `libc` crate fork's `struct statvfs` is Linux musl's (no `f_type`; and since VFS step 2d, none of the mount names OxideBSD's musl adds), so a Rust crate calling `libc::statvfs` gets a short buffer filled long. No Rust code here calls it. | The struct matches musl's | v0.3.0 |
 | Only `passwd(1)` changes `/etc/master.passwd` and `/etc/passwd` (through `pam_unix`); no tool adds or removes users or groups (`adduser`, `pw`, `vipw`). | They can | v0.3.0 |
 
 ## 8. History

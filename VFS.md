@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
-Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0
-and 1 of §11 implemented, step 2 in progress (2a, 2b and 2c done); 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0,
+1 and 2 of §11 implemented; 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -324,8 +324,8 @@ steps.
    execute bit, as on the BSDs); **2c** every holder of an inode number moved to vnode references,
    `oxidebsd_inode_in_use` and the orphan sweep deleted (**done**: `dcf4f5d`; with it the
    content accessors and block map gone for the vnode operations, `ETXTBSY`, and nullfs vnodes
-   sharing the lower vnode); **2d** `getfsstat`, `MNT_FORCE`, deadfs
-   and `revoke(2)`. Plain `nmount`/`unmount` and the mount table, and cwd and root as vnodes, go
+   sharing the lower vnode); **2d** `getvfsstat`, `MNT_FORCE`, deadfs
+   and `revoke(2)` (**done**: `c22bf2a`, musl `39eb8904`). Plain `nmount`/`unmount` and the mount table, and cwd and root as vnodes, go
    with 2b instead: the kernel's `namei` crosses mounts and starts from the cwd (found while
    planning 2b).
 3. **Split out** tmpfs, devfs and nullfs as their own types and modules.
