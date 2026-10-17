@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
-Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0,
-1 and 2 of §11 implemented; 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0-3
+of §11 implemented; 4-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -334,8 +334,12 @@ steps.
    passing the type's options through, `noexec`, read-only mounts of any type, `mount -u` of any
    mount point, `vfs.tmpfs.memory_reserved`; found: exec leaked a vnode reference when it failed
    after reading the program's head, and unmount stayed `EBUSY` for a file system a program had
-   run from, the page cache's idle entry holding the vnode); **3c** devfs; **3d** nullfs over any
-   type, oxfs left a disk file system only.
+   run from, the page cache's idle entry holding the vnode); **3c** devfs (**done**: `a27ca0d`;
+   `/dev/shm` a tmpfs from `fstab`, oxfs's memory pool gone); **3d** nullfs over any type, oxfs
+   left a disk file system only (**done**: `1a8959b`; modules call other vnodes' operations
+   through the kernel's `oxidebsd_vop_*`; found: `flock` keyed locks by the descriptor's vnode,
+   so a file could be locked through nullfs and the lower path at once, and `getcwd`'s directory
+   scan matched a layered vnode's hash key instead of its serial number).
 4. **msdosfs** (§9), the kernel's time zone offset; `/boot/efi` in `fstab` on systems with an ESP.
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
 6. **Per-vnode locks** with SMP (v0.5.0).
@@ -354,7 +358,10 @@ None left from the review. New ones go here as steps uncover them.
 `/dev/shm` are the shared memory objects (`VF_SHM`), decided by the mount point, since no BSD
 has an option for it; the kernel's vnode operation calls for modules go with nullfs (3d), their
 first user, not 3a; tests that use `/dev/shm` mount it through a test-kernel helper, since test
-kernels run no `/etc/rc`.
+kernels run no `/etc/rc`; devfs takes sockets as well as directories and links (`bind` of
+`/dev/log`, which musl's `syslog(3)` and syslogd use, as OpenBSD does: FreeBSD's devfs takes none,
+its socket being `/var/run/log`); `flock` locks are the contents' (`object_vp`), so nullfs and the
+path below it share them, as FreeBSD's nullfs passes `VOP_ADVLOCK` down.
 
 2026-10-17 (user, step 3): step 3 lands as 3a (the devices oxfs implemented, `null`, `zero`,
 `random`, `urandom` and `fb0`, move into the kernel proper, and modules get the kernel's vnode
