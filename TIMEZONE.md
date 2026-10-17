@@ -50,6 +50,14 @@ operating system's convention, FreeBSD's `/etc/wall_cmos_clock`) is not supporte
 
 4.4. No zone is chosen by default; a new system runs in UTC until `tzsetup` is run.
 
+4.5. The kernel knows the local zone's offset only for the formats that store local time, FAT's
+timestamps (msdosfs, `VFS.md` §9.2): `kern.utc_offset`, minutes east of UTC (OpenBSD's name and
+unit; there it is the hardware clock's offset, here the clock stays UTC). `adjkerntz -a`
+(FreeBSD's name) sets it from `/etc/localtime`, ignoring `TZ`; rc runs it at boot before any file
+system is checked, the system crontab at one minute past every hour (decided 2026-10-17: cron, not
+FreeBSD's daemon), and `tzsetup` after a change. A time is converted with the offset in effect
+now, not at that time, as on FreeBSD and Windows.
+
 ## 5. `tzsetup`
 
 5.1. `tzsetup zone` links `/etc/localtime` to that zone after checking that it exists and is a
