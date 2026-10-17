@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
 Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0
-and 1 of §11 implemented, step 2 in progress (2a and 2b done); 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+and 1 of §11 implemented, step 2 in progress (2a, 2b and 2c done); 3-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -213,7 +213,8 @@ reads that device through §8.2's block interface (since step 1b the fill reads 
 no block device (tmpfs, procfs) fills through `vop_read`, as tmpfs does today.
 
 7.3. `content_changed` becomes the VFS's own invalidation on `vop_write`, `vop_setattr` (size)
-and reclaim; file systems no longer call it.
+and reclaim; file systems no longer call it (done in step 2c: `pagecache::changed` before the
+operation, `vnode_gone` from `vgone`).
 
 7.4. **A shared buffer cache** (decided 2026-10-15, done in step 1b): FreeBSD's `buf` layer in
 miniature (`sys/kern/vfs_bio.rs`): `bread(dev, blkno, size, ahead)`, `getblk`, `bwrite`,
@@ -280,9 +281,8 @@ reached the source directory's parent; `getcwd` inside a tmpfs or bind mount sto
 chroot didn't hide it and `/./proc` or a link to it missed it; symbolic link targets were cut at
 256 bytes. Step 1a made `lseek` on a pipe `ESPIPE`.
 
-Still open, for step 2c: an open FIFO is keyed by its inode number. Since 2b its descriptor
-holds the vnode it was opened through, so the inode isn't freed while the FIFO is open; keying
-the FIFO by vnode is 2c's.
+Step 2c keyed FIFOs by vnode, which their descriptors hold: an open FIFO's file can't be freed
+and its number reused under it.
 
 ## 11. Migration
 
@@ -322,7 +322,9 @@ steps.
    and a freed inode's number came back with its old vnode still hashed, now recycled when oxfs
    frees it; `open("")` is `ENOENT`, each mount has its own `st_dev`, root's `X_OK` needs an
    execute bit, as on the BSDs); **2c** every holder of an inode number moved to vnode references,
-   `oxidebsd_inode_in_use` and the orphan sweep deleted; **2d** `getfsstat`, `MNT_FORCE`, deadfs
+   `oxidebsd_inode_in_use` and the orphan sweep deleted (**done**: `dcf4f5d`; with it the
+   content accessors and block map gone for the vnode operations, `ETXTBSY`, and nullfs vnodes
+   sharing the lower vnode); **2d** `getfsstat`, `MNT_FORCE`, deadfs
    and `revoke(2)`. Plain `nmount`/`unmount` and the mount table, and cwd and root as vnodes, go
    with 2b instead: the kernel's `namei` crosses mounts and starts from the cwd (found while
    planning 2b).
