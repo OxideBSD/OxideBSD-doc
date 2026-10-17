@@ -328,7 +328,14 @@ steps.
    and `revoke(2)` (**done**: `c22bf2a`, musl `39eb8904`). Plain `nmount`/`unmount` and the mount table, and cwd and root as vnodes, go
    with 2b instead: the kernel's `namei` crosses mounts and starts from the cwd (found while
    planning 2b).
-3. **Split out** tmpfs, devfs and nullfs as their own types and modules.
+3. **Split out** tmpfs, devfs and nullfs as their own types and modules, in four parts (decided
+   2026-10-17): **3a** the devices oxfs implemented (`null`, `zero`, `random`, `urandom`, `fb0`)
+   in the kernel proper (**done**: `338d6d0`); **3b** tmpfs (**done**: `fe0e363`; with it `nmount`
+   passing the type's options through, `noexec`, read-only mounts of any type, `mount -u` of any
+   mount point, `vfs.tmpfs.memory_reserved`; found: exec leaked a vnode reference when it failed
+   after reading the program's head, and unmount stayed `EBUSY` for a file system a program had
+   run from, the page cache's idle entry holding the vnode); **3c** devfs; **3d** nullfs over any
+   type, oxfs left a disk file system only.
 4. **msdosfs** (§9), the kernel's time zone offset; `/boot/efi` in `fstab` on systems with an ESP.
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
 6. **Per-vnode locks** with SMP (v0.5.0).
@@ -342,6 +349,12 @@ each step reviewable and bisectable.
 None left from the review. New ones go here as steps uncover them.
 
 ## 13. Decisions
+
+2026-10-17 (Claude's calls, step 3, open to veto): the regular files of the tmpfs mounted on
+`/dev/shm` are the shared memory objects (`VF_SHM`), decided by the mount point, since no BSD
+has an option for it; the kernel's vnode operation calls for modules go with nullfs (3d), their
+first user, not 3a; tests that use `/dev/shm` mount it through a test-kernel helper, since test
+kernels run no `/etc/rc`.
 
 2026-10-17 (user, step 3): step 3 lands as 3a (the devices oxfs implemented, `null`, `zero`,
 `random`, `urandom` and `fb0`, move into the kernel proper, and modules get the kernel's vnode
