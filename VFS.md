@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
 Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0-3
-of §11 implemented; 4-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+of §11 implemented, step 4 in progress (4a-4c done); 5-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -341,6 +341,11 @@ steps.
    so a file could be locked through nullfs and the lower path at once, and `getcwd`'s directory
    scan matched a layered vnode's hash key instead of its serial number).
 4. **msdosfs** (§9), the kernel's time zone offset; `/boot/efi` in `fstab` on systems with an ESP.
+   In five parts (decided 2026-10-17): **4a** `kern.utc_offset` and `adjkerntz(8)` (**done**:
+   `8226d84`); **4b** the FAT tools: `fsck_msdosfs`, `newfs_msdos`, `makefs -o fat_type=`, code
+   pages (**done**: `a965603`); **4c** the msdosfs module, read-only, and mounts from a disk device
+   (**done**: `a61f667`); **4d** writing and `mount_msdosfs`'s options; **4e** `/boot/efi` on
+   disks with an ESP.
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
 6. **Per-vnode locks** with SMP (v0.5.0).
 
@@ -353,6 +358,27 @@ each step reviewable and bisectable.
 None left from the review. New ones go here as steps uncover them.
 
 ## 13. Decisions
+
+2026-10-17 (user, step 4): `kern.utc_offset` in minutes east (OpenBSD's name and unit), set by
+`adjkerntz -a` at boot and hourly from cron (not FreeBSD's daemon); `-L` accepts only UTF-8 code
+sets, `-D` takes every DOS and Windows code page including the double-byte CJK ones, as files in
+`/usr/share/msdosfs` that `mount_msdosfs` compiles and hands to the kernel (FreeBSD's kiconv in
+shape); a volume not marked clean mounts read-only unless forced (`mount -f`), and
+`fsck_msdosfs` (FreeBSD's, complete) and `newfs_msdos` come with step 4; `/boot/efi` goes into
+the root image's `fstab` (and `fsconf`) only on disks that have an ESP.
+
+2026-10-17 (Claude's calls, step 4, open to veto): a file's ID is its directory entry's byte
+offset on the device / 32 and a directory's its first cluster's (so renaming a directory keeps it;
+the root's is 1); msdosfs has no `bmap` (FAT's data area and small clusters don't line up with
+the page cache's 4 KiB device blocks), so mapped pages fill through `read`, as tmpfs's do; FSInfo's
+free count is a hint (`fsck_msdosfs` corrects it when it can write, never fails on it; msdosfs
+counts the FAT); `nmount` option values may be 512 KiB (a CJK table in hex), names stay short;
+`nmount` opens the device `from` names for any type that is neither synthetic nor layered, and a
+device is mounted once at a time (`EBUSY`); devfs's `v_rdev` is musl's `makedev` encoding, which
+the interface's comment had wrong; the write ordering is data, then FAT, then directories (the
+cache's hook), frees write the entry first, and a rename removes the old entry before writing the
+new one, so a crash leaves only what `fsck_msdosfs -p` repairs; a rename to a name that differs
+only in case is the POSIX no-op (both names are the same entry).
 
 2026-10-17 (Claude's calls, step 3, open to veto): the regular files of the tmpfs mounted on
 `/dev/shm` are the shared memory objects (`VF_SHM`), decided by the mount point, since no BSD
