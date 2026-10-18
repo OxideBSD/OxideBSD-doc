@@ -1,6 +1,6 @@
 # OxideBSD programs: file placement inventory
 
-Status: **current** (2026-10-18, `5812226`).
+Status: **current** (2026-10-18, `3b3a6d4`).
 
 ## 1. Scope
 
@@ -24,17 +24,15 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 `sh` is OxideBSD's own shell (`lib/libsh`). `vi` is OpenVi (`bin/vi`). The rest are Rust `std`
 programs; `grep`, `sed`, `ed` and `expr` share `lib/libregex`, `gzip` and `tar` share `lib/libz`.
 
-## 3. `/sbin` (30 entries)
+## 3. `/sbin` (33 entries)
 
 | Source | Programs |
 |--------|----------|
-| Native (`sbin/`, 21) | `adjkerntz`, `dmesg`, `emergency`, `fsck`, `fsck_msdosfs`, `fsck_oxfs`, `init`, `init_sh`, `lsoxmod`, `mknod`, `mount`, `newfs_msdos`, `newfs_oxfs`, `nologin`, `ping` (set-user-ID root, mode 4555), `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount`, `update` |
+| Native (`sbin/`, 24) | `adjkerntz`, `dhclient`, `dmesg`, `emergency`, `fsck`, `fsck_msdosfs`, `fsck_oxfs`, `ifconfig`, `init`, `init_sh`, `lsoxmod`, `mknod`, `mount`, `newfs_msdos`, `newfs_oxfs`, `nologin`, `ping` (set-user-ID root, mode 4555), `rcorder`, `reboot`, `route`, `shutdown`, `sysctl`, `umount`, `update` |
 | Third-party (1) | `zstd` (`external/bsd/zstd`, static, so a set archive unpacks before `/usr` exists; `RAM_FLOOR.md` §4.3.4) |
 | Links (8) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `mount_tmpfs` = `mount`, `mount_msdosfs` = `mount`, `lsmod` -> `lsoxmod`, `unzstd` = `zstd`, `zstdcat` = `zstd` |
 
 `init_sh` is the non-interactive interpreter for `/etc/rc` and `/etc/rc.d/*` (`INIT_SH.md`).
-
-Not yet present, and expected here: `ifconfig`, `route` and `dhclient`.
 
 ## 4. `/usr/bin` (127 entries)
 

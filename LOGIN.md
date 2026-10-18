@@ -117,6 +117,7 @@ pam_module` for each:
 | `pam_securetty` | account | Refuses root on a terminal not marked `secure` in `/etc/ttys` |
 | `pam_lastlog` | session | Prints the user's last login, and records this one, in `lastlogx` |
 | `pam_permit`, `pam_deny` | all | Always succeed / always fail |
+| `pam_rootok` | auth | Succeeds when the real user ID is root (`su` from root asks no password) |
 
 6.4. Policies follow FreeBSD's and NetBSD's layout: `/etc/pam.d/system` holds the common stack, and
 `/etc/pam.d/login` includes it and adds `pam_nologin` and `pam_securetty` to its account stack.

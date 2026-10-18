@@ -44,10 +44,9 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| The guest's IP address and gateway are compiled in; no `ifconfig`, no DHCP client. | Configured at boot (`rc.conf`) | v0.3.0 (`INIT.md`: `ifconfig_*`) |
-| A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces (`lo0`, `rl0`) configured at build time. | A routing table and `ifconfig`/`route` | later |
+| A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces, one address each; `route` sets only the default. | A routing table, aliases, more interfaces | later |
+| `dhclient` takes the first offer, sends no `DHCPDECLINE`, doesn't ARP-check the address, and has no configuration file. | ISC/OpenBSD-level client | later |
 | `IP_TTL`, `IP_TOS` and binding a raw socket are accepted and ignored; there is no `IP_DONTFRAG`. | The IP-level socket options | v0.3.0 |
-| Incoming packets are processed only by processes waiting in the network stack: the rtl8139 interrupt only sets a flag and wakes waiters, and a wait involving a socket wakes every 50 ms to drive the NIC. | Interrupt-driven receive | v0.3.0 |
 | TCP is stop-and-wait with a fixed 536-byte segment size, no window or congestion control. | Real TCP | later |
 | No IPv6. | IPv6 | later |
 
@@ -63,6 +62,8 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-18 — rl0's address and gateway compiled in, no `ifconfig`, no DHCP: interface ioctls, `net.inet.ip.default_gateway`, `ifconfig`/`route`/`dhclient`, `rc.d/netif` from `ifconfig_rl0` — 47aca9a, 3b3a6d4
+- 2026-10-18 — packets processed only by processes waiting on sockets, which woke every 50 ms to drive the NIC: `softnet` from the NIC interrupt, the timer and the idle loop — 47aca9a
 - 2026-10-18 — BusyBox's `grep sed ed expr gzip tar ps pgrep ping` (and their links): Rust `std` rewrites over `lib/libregex` and `lib/libz`; `ash` removed; nothing BusyBox left in `/bin` or `/sbin` — 5812226
 - 2026-10-18 — msdosfs kept out of the name cache: the cache folds case for `VFCF_CASEFOLD` types — ac07e69
 - 2026-10-18 — `RLIMIT_CORE` stored, no core dumps, every signal death reporting `WCOREDUMP`: ELF core files (`kern.corefile`, `kern.sugid_coredump`) — 1bb4500
