@@ -103,6 +103,7 @@ Decided 2026-09-23.
   `x86_64-unknown-oxidebsd` runs on it instead of musl, with no change to the `std`-based
   utilities.
 - A batch of userland work (not yet itemized).
+- Building larger software projects on OxideBSD (added 2026-10-17).
 
 ### 3.4. v0.5.0: SMP
 
