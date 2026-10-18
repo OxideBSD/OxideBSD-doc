@@ -1,8 +1,7 @@
 # OxideBSD per-process address-space map: design specification
 
-Status: **draft, under review** (2026-10-17). Asked for by `CLEANUP.md` §3 (`RLIMIT_AS`) and §7
-(`MAP_FIXED` region splitting); decided with the user that it is a real map of regions, not a
-counter. No code before this is accepted.
+Status: **accepted** (2026-10-17), with the user's answers to the open questions (§13).
+Asked for by `CLEANUP.md` §3 (`RLIMIT_AS`) and §7 (`MAP_FIXED` region splitting).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -95,7 +94,9 @@ the hint, or above the mmap base when the hint is zero or unusable, bottom-up (F
 4.2. An address freed by `munmap` or `shmdt` MUST be usable again by that process.
 `NEXT_MMAP_PAGE` and `NEXT_SHM_PAGE` are removed; SysV segments map from the same window.
 
-4.3. `MAP_FIXED` MUST replace whatever entries (or parts of entries) its range overlaps, as one
+4.3. `MAP_FIXED|MAP_EXCL` (FreeBSD's) MUST fail with `EINVAL` when its range overlaps an entry,
+instead of replacing it; musl's `MAP_FIXED_NOREPLACE` is accepted as the same request (with
+`EEXIST`, its documented error). Otherwise `MAP_FIXED` MUST replace whatever entries (or parts of entries) its range overlaps, as one
 operation: the old pages go as `munmap` would make them go (§7), then the new entry is
 inserted. `MAP_FIXED` over a `Kernel` entry MUST fail with `EINVAL`.
 
@@ -168,7 +169,9 @@ as now.
 9.4. `/proc/<pid>/map` lists the entries, one line each, in FreeBSD procfs's `map` format:
 start, end, resident pages, private resident pages, object, protection, reference counts,
 copy-on-write and need-copy flags, type (`default`/`vnode`/`phys`/`swap`), and the vnode's path
-where the name cache knows it. `RLIMIT_AS`'s measure is reported as `vsz` by `ps`.
+where the name cache knows it. `/proc/<pid>/maps` lists the same entries in Linux's format
+(`start-end perms offset dev inode path`), for ported tools that parse it. `RLIMIT_AS`'s measure
+is reported as `vsz` by `ps`.
 
 ## 10. Core dumps
 
@@ -202,14 +205,11 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
 
 ## 13. Open questions
 
-1. **`/proc/<pid>/map` format**: FreeBSD procfs's `map` (§9.4) as proposed, or Linux's
-   `maps` (a Linuxulator would want it later, under `/compat/linux/proc`)?
-2. **`MAP_EXCL`** (FreeBSD: `MAP_FIXED|MAP_EXCL` fails with `EINVAL` instead of replacing):
-   add it now, and Linux's `MAP_FIXED_NOREPLACE` spelling of the same thing for ported code?
-3. **Allocation direction**: bottom-up from a random base (FreeBSD, §4.1) or top-down from the
-   window's top (Linux, OpenBSD's `uvm_map_hint` randomizes each allocation instead)?
-4. **SysV window**: fold `shmat` into the mmap window (§4.2), or keep its own?
+None left (§14).
 
 ## 14. Decisions
 
 - 2026-10-17 (user): a real per-address-space map, not a mapped-bytes counter; spec first.
+- 2026-10-17 (user): both `/proc/<pid>/map` (FreeBSD) and `/proc/<pid>/maps` (Linux) now (§9.4);
+  bottom-up first fit from a random base, with `MAP_EXCL` and `MAP_FIXED_NOREPLACE` (§4); SysV
+  `shmat` folded into the mmap window (§4.2).
