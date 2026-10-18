@@ -1,15 +1,16 @@
 # OxideBSD BusyBox: applet roster
 
-Status: **current** (2026-10-18, `5812226`). 96 applets.
+Status: **current** (2026-10-18, `4e7df04`). 96 applets.
 
 ## 1. Scope
 
-BusyBox is vendored unpatched at `external/gpl2/busybox` (tag `1_38_0`). Each applet is its own
-static, fixed-address binary: `build_busybox_applet` configures BusyBox with `allnoconfig` plus
-the one applet's Kconfig symbol and asserts `NUM_APPLETS == 1`. The roster is the two tuple
-arrays `BUSYBOX_APPLETS` (11 entries) and `BUSYBOX_APPLETS_PASS2` (85 entries) in
-`build_busybox.rs`; `distrib/install.mtree` installs each binary at the path listed in §2. Editing `build_busybox.rs`
-rebuilds every applet (20 to 40 minutes), so roster changes are batched.
+BusyBox is vendored unpatched at `external/gpl2/busybox` (tag `1_38_0`). The roster is one
+multi-call binary, `/usr/libexec/busybox`, a dynamic PIE on `/lib/libc.so`: `build_busybox`
+configures BusyBox with `allnoconfig` plus each applet's Kconfig symbol, `CONFIG_PIE` and the
+features listed in `configure_busybox`, and asserts `NUM_APPLETS` equals the roster's length.
+The roster is the array `BUSYBOX_APPLETS` in `build_busybox.rs`; `distrib/install.mtree` gives
+the binary one hard link per applet, at the path listed in §2, and BusyBox picks the applet from
+`argv[0]`. Editing `build_busybox.rs` rebuilds BusyBox (under a minute).
 
 Where every program goes, BusyBox or not: `HIER.md`. Native rewrites still planned:
 `INIT_WORKPLAN.md`.

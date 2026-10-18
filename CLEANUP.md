@@ -21,7 +21,7 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| `RLIMIT_CPU` and `RLIMIT_RSS` are stored, not enforced. Anonymous memory is allocated when it's mapped, not on first touch (`VMMAP.md` step 3). | Enforced limits; memory on demand | v0.3.0 |
+| `RLIMIT_CPU` and `RLIMIT_RSS` are stored, not enforced. | Enforced limits | v0.3.0 |
 | A core signal sent by another process (`kill -SEGV`, a terminal's `SIGQUIT`) kills without a core: only a process that takes the signal itself dumps one. | Every core-signal death dumps | v0.3.0 |
 | `/proc/<pid>/stat` leaves out rss, flags, fault counts, pending signals and the thread count; there is no `/proc/<pid>/environ`, no wait channel and no boot time, so `ps` prints `-` for them. | The full process information | v0.3.0 |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
@@ -55,13 +55,13 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | No mfsroot: a boot with no disk has no root file system to install or recover from. | A small mfsroot loaded beside the kernel | v0.3.0 (`RAM_FLOOR.md` piece C) |
-| BusyBox's 96 applets (all in `/usr`) are separate static binaries at fixed load addresses. | One position-independent multi-call binary | v0.3.0 |
-| The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
 
 ## 8. History
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-18 — BusyBox as 96 static fixed-address binaries; bmake, vi, nano, ninja, doom and the POSIX corpus at fixed addresses under a moving floor: one multi-call PIE BusyBox, PIE ports — 4e7df04
+- 2026-10-18 — anonymous memory and the heap allocated when mapped: made at first touch (`VMMAP.md` step 3) — 62216c8
 - 2026-10-18 — rl0's address and gateway compiled in, no `ifconfig`, no DHCP: interface ioctls, `net.inet.ip.default_gateway`, `ifconfig`/`route`/`dhclient`, `rc.d/netif` from `ifconfig_rl0` — 47aca9a, 3b3a6d4
 - 2026-10-18 — packets processed only by processes waiting on sockets, which woke every 50 ms to drive the NIC: `softnet` from the NIC interrupt, the timer and the idle loop — 47aca9a
 - 2026-10-18 — BusyBox's `grep sed ed expr gzip tar ps pgrep ping` (and their links): Rust `std` rewrites over `lib/libregex` and `lib/libz`; `ash` removed; nothing BusyBox left in `/bin` or `/sbin` — 5812226
