@@ -1,7 +1,7 @@
 # OxideBSD virtual file system: design specification
 
-Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0-4
-of §11 implemented; 5-6 not yet. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
+Status: **accepted** (2026-10-15; the user's answers to the open questions are in §13). Steps 0-5
+of §11 implemented; 6 (per-vnode locks) waits for SMP. Target release: v0.3.0 for steps 0-4 of §11 (they unblock the kernel's msdosfs and
 `RAM_FLOOR.md` §4.7-4.8); the rest may slip to v0.4.0.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
@@ -346,7 +346,9 @@ steps.
    pages (**done**: `a965603`); **4c** the msdosfs module, read-only, and mounts from a disk device
    (**done**: `a61f667`); **4d** writing and `mount_msdosfs`'s options (**done**: `060b108`); **4e** `/boot/efi` on
    disks with an ESP (**done**: `784d11b`).
-5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`.
+5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`. (**done**: 5a `f7e0d49` oxfs
+   mounts the device it's handed; 5b the kernel's switch; 5c `reboot -r`, init and the test;
+   RAM_FLOOR.md §5.1.)
 6. **Per-vnode locks** with SMP (v0.5.0).
 
 Steps 1 and 2 are the old single "VFS core" step split in two (Claude's call, 2026-10-15, open
