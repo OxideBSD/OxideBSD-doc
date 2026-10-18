@@ -347,7 +347,7 @@ steps.
    (**done**: `a61f667`); **4d** writing and `mount_msdosfs`'s options (**done**: `060b108`); **4e** `/boot/efi` on
    disks with an ESP (**done**: `784d11b`).
 5. **The root switch** (`reboot -r`), for piece C's mfsroot and `oxupdate`. (**done**: 5a `f7e0d49` oxfs
-   mounts the device it's handed; 5b the kernel's switch; 5c `reboot -r`, init and the test;
+   mounts the device it's handed; 5b `8ef7098` the kernel's switch; 5c `f075a86` `reboot -r`, init and the test;
    RAM_FLOOR.md §5.1.)
 6. **Per-vnode locks** with SMP (v0.5.0).
 
