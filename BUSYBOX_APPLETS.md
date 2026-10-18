@@ -1,13 +1,13 @@
 # OxideBSD BusyBox: applet roster
 
-Status: **current** (2026-10-15, `34b5b55`). 119 applets.
+Status: **current** (2026-10-18, `9d80771`). 111 applets.
 
 ## 1. Scope
 
 BusyBox is vendored unpatched at `external/gpl2/busybox` (tag `1_38_0`). Each applet is its own
 static, fixed-address binary: `build_busybox_applet` configures BusyBox with `allnoconfig` plus
 the one applet's Kconfig symbol and asserts `NUM_APPLETS == 1`. The roster is the two tuple
-arrays `BUSYBOX_APPLETS` (11 entries) and `BUSYBOX_APPLETS_PASS2` (108 entries) in
+arrays `BUSYBOX_APPLETS` (11 entries) and `BUSYBOX_APPLETS_PASS2` (100 entries) in
 `build_busybox.rs`; `distrib/install.mtree` installs each binary at the path listed in §2. Editing `build_busybox.rs`
 rebuilds every applet (20 to 40 minutes), so roster changes are batched.
 
@@ -18,8 +18,8 @@ Where every program goes, BusyBox or not: `HIER.md`. Native rewrites still plann
 
 | Directory | Count | Applets |
 |-----------|------:|---------|
-| `/bin` | 21 | `ash`, `date`, `dd`, `df`, `ed`, `egrep`, `expr`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `pgrep`, `pkill`, `ps`, `realpath`, `sed`, `stty`, `tar`, `timeout`, `zcat` |
-| `/sbin` | 2 | `mknod`, `ping` |
+| `/bin` | 14 | `ash`, `ed`, `egrep`, `expr`, `fgrep`, `grep`, `gunzip`, `gzip`, `pgrep`, `pkill`, `ps`, `sed`, `tar`, `zcat` |
+| `/sbin` | 1 | `ping` |
 | `/usr/bin` | 94 | `ar`, `arch`, `awk`, `base64`, `basename`, `bc`, `bunzip2`, `bzcat`, `bzip2`, `cal`, `chat`, `chgrp`, `chown`, `cksum`, `cmp`, `comm`, `cpio`, `cut`, `dc`, `diff`, `dirname`, `du`, `env`, `expand`, `find`, `flock`, `fold`, `fsync`, `getopt`, `groups`, `head`, `hexdump`, `id`, `install`, `last`, `logname`, `md5sum`, `mesg`, `mkfifo`, `mktemp`, `nc`, `nice`, `nl`, `nohup`, `od`, `paste`, `patch`, `printenv`, `printf`, `readlink`, `renice`, `rev`, `script`, `seq`, `sha1sum`, `sha256sum`, `sha512sum`, `sort`, `split`, `ssl_client`, `stat`, `strings`, `sum`, `tail`, `tee`, `telnet`, `time`, `tr`, `traceroute`, `truncate`, `tsort`, `tty`, `uname`, `uncompress`, `unexpand`, `uniq`, `unxz`, `unzip`, `uptime`, `users`, `uudecode`, `uuencode`, `uuidgen`, `w`, `wall`, `wc`, `wget`, `which`, `who`, `whoami`, `whois`, `xargs`, `xzcat`, `yes` |
 | `/usr/sbin` | 2 | `chroot`, `ntpd` |
 
@@ -42,6 +42,7 @@ now occupies the slot; "dropped" means nothing replaced it.
 
 | Commit | Date | Applets | Replacement or reason |
 |--------|------|---------|-----------------------|
+| `9d80771` | 2026-10-18 | `date`, `dd`, `df`, `hostname`, `mknod`, `realpath`, `stty`, `timeout` | Native Rust `std` programs, same paths |
 | `34b5b55` | 2026-10-15 | `ipcrm` | Native `/usr/bin/ipcrm`, with a native `ipcs`, over the `kern.ipc` tables. |
 | `cb10bdf` | 2026-10-14 | `clear`, `reset` | ncurses' own `clear` and `tset` (`reset` is a link to it), with `tput`: what the BSDs ship. |
 | `cb10bdf` | 2026-10-14 | `ftpget`, `ftpput`, `nslookup` | Dropped: in no BSD base system (the BSDs have `ftp`/`fetch` and `host`/`drill`). |

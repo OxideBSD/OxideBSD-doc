@@ -21,7 +21,7 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| `RLIMIT_AS` and `RLIMIT_CORE` are stored, not enforced: there is no map of a process's regions to measure (anonymous `mmap` takes address space from one system-wide bump pointer, never reused, and allocates every page at once), and no core dumps. `RLIMIT_CPU` and `RLIMIT_RSS` aren't either. | Enforced, over a per-process `vm_map` and real core dumps | v0.3.0 |
+| `RLIMIT_CORE` is stored, not enforced: there are no core dumps. `RLIMIT_CPU` and `RLIMIT_RSS` aren't either. Anonymous memory is allocated when it's mapped, not on first touch (`VMMAP.md` step 3). | Real core dumps; memory on demand | v0.3.0 |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 
 ## 4. Files and descriptors
@@ -53,15 +53,16 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | No mfsroot: a boot with no disk has no root file system to install or recover from. | A small mfsroot loaded beside the kernel | v0.3.0 (`RAM_FLOOR.md` piece C) |
-| BusyBox applets are 119 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
+| BusyBox applets are 111 separate static binaries at fixed load addresses; `/bin`'s text, archive and process tools (`grep`, `sed`, `ed`, `expr`, `gzip`, `tar`, `ps`, `pgrep`, `ping`, ...) are still among them. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
-| After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
 | msdosfs keeps out of the name cache (`VFCF_NOCACHE`): a case-insensitive lookup would cache the case the caller used, and `getcwd` reports it. Every msdosfs lookup reads the directory. | The cache folds case for such mounts | v0.4.0 |
 
 ## 8. History
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-18 — no map of a process's mappings: anonymous `mmap` from one system-wide bump pointer, `munmap`/`MAP_FIXED` blind to part of a mapping, `RLIMIT_AS` unenforced: a per-address-space `vm_map` (`VMMAP.md` steps 1, 2, 4) — d561158
+- 2026-10-18 — `/bin`'s oxlibc utilities and BusyBox's `date dd df hostname mknod realpath stty timeout`: Rust `std` rewrites — 9d80771
 - 2026-10-18 — the libc crate fork used Linux's `SYS_*` numbers and Linux musl's `struct statvfs`: OxideBSD's own — 2216b96
 - 2026-10-18 — no tool but `passwd(1)` could change the account database: `useradd` family, `pw(8)`, `vipw(8)`, `adduser(8)`, `rmuser(8)` — f7579fa
 - 2026-10-18 — `touch(1)` took only `-c`: POSIX's `-a -c -m -r -t -d` — e61dbca
