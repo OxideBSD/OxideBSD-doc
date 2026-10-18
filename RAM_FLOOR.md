@@ -535,6 +535,39 @@ free at a root shell); at 28 MB syslogd can't fork.
   MiB, leaving the 128 MB machine its memory once the real root is mounted (or the mfsroot
   freed).
 
+### 5.1. The root switch (`reboot -r`, VFS.md §11 step 5)
+
+5.1.1. `reboot -r [type:]special` replaces the root file system without restarting the kernel:
+FreeBSD's reroot, which piece C's handover from the mfsroot to the disk and `oxupdate` use. With
+no `special`, the root `/etc/fstab` names; without `type:`, fstab's type for that device, else
+`oxfs`. `reboot(8)` checks the device exists, writes the spec to `/var/run/reroot` (mode 0600)
+and sends init `SIGEMT` (FreeBSD's reroot signal). A signal carries no string; the file is read
+before anything is unmounted. (Decided 2026-10-17: an argument to `reboot`, not FreeBSD's
+`vfs.root.mountfrom`.)
+
+5.1.2. init treats `SIGEMT` as a shutdown (`/etc/rc.shutdown`, `SIGTERM` then `SIGKILL` to every
+process, `sync`) that ends in `reboot(RB_REROOT, spec)` instead of a reset. `reboot(2)` takes a
+second argument for it, NetBSD's `bootstr` in shape.
+
+5.1.3. The kernel, in pid 1's `reboot(RB_REROOT)` call: looks the device up while the old root is
+mounted; drops pid 1's address space, its descriptors other than devfs's, and its cwd and root;
+takes devfs off the old root's `/dev` without unmounting it; unmounts every other file system,
+the old root last (each written out and marked clean); mounts the new root read-only, as at boot
+(rc's fsck and remount follow); puts devfs back on the new root's `/dev` and mounts procfs on
+`/proc`; and has pid 1 execute `init_path` from the new root (`/sbin/init`, then
+`/sbin/emergency`), as at boot. Only devfs survives (decided 2026-10-17: FreeBSD's rule);
+everything a tmpfs held is gone. If the new root can't be mounted, the old one is mounted again
+and init re-executed from it, with the reason on the console.
+
+5.1.4. oxfs mounts from the device the kernel hands it (`MountArgs::dev`), not the boot root's,
+and unmounts completely, so it can be mounted again from another partition. One oxfs at a time
+still (a second needs per-instance state, §4.8).
+
+5.1.5. Test: a disk with two oxfs partitions, `rootfs` and `rootfs2` (a copy with a marker); a
+test boots on `rootfs`, reroots to `rootfs2`, checks the marker, `mount`, and that `rootfs` was
+left clean (`fsck_oxfs -n`), then reroots back. Commits: 5a oxfs any device, 5b the kernel's
+switch, 5c init, `reboot -r` and the test.
+
 ## 6. Decisions
 
 2026-10-12: write-back with synchronous metadata (§3.3), a userland `update(8)` rather than
