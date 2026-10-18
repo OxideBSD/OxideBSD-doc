@@ -1,12 +1,11 @@
 # OxideBSD programs: file placement inventory
 
-Status: **current** (2026-10-15, `c2595d0`).
+Status: **current** (2026-10-18, `5812226`).
 
 ## 1. Scope
 
-Every program oxfs seeds into the base system (`sys/modules/oxfs/src/lib.rs`, `seed_file`,
-`seed_symlink`, `seed_hardlink` and the generated `seed_tree` lists), by directory and by where
-its source lives. The placement rules and every directory are in `hier(7)`
+Every program the base system installs (`distrib/install.mtree`, the sets in
+`distrib/sets/lists/*`), by directory and by where its source lives. The placement rules and every directory are in `hier(7)`
 (`share/man/man7/hier.7`). Programs in `/bin` and `/sbin` are static PIE. Elsewhere, OxideBSD's
 own programs are dynamic PIEs on `/lib/libc.so`; ports linked at a fixed address (BusyBox, bmake
 and others) are static.
@@ -15,29 +14,27 @@ Source locations: native programs live at the same path in the tree (`bin/`, `sb
 `usr.sbin/`, `libexec/`); BusyBox applets build from `external/gpl2/busybox`
 (`BUSYBOX_APPLETS.md`). Links are marked `->` (symbolic) or `=` (hard).
 
-## 2. `/bin` (44 entries)
+## 2. `/bin` (45 entries)
 
 | Source | Programs |
 |--------|----------|
-| Native (`bin/`, 23) | `cat`, `chmod`, `cp`, `echo`, `false`, `kill`, `link`, `ln`, `ls`, `mkdir`, `mv`, `nproc`, `pwd`, `rm`, `rmdir`, `sh`, `sleep`, `sync`, `test`, `touch`, `true`, `unlink`, `vi` |
-| Links (1) | `[` = `test` |
-| BusyBox (21) | `ash`, `date`, `dd`, `df`, `ed`, `egrep`, `expr`, `fgrep`, `grep`, `gunzip`, `gzip`, `hostname`, `pgrep`, `pkill`, `ps`, `realpath`, `sed`, `stty`, `tar`, `timeout`, `zcat` |
+| Native (`bin/`, 38) | `cat`, `chmod`, `cp`, `date`, `dd`, `df`, `echo`, `ed`, `expr`, `false`, `grep`, `gzip`, `hostname`, `kill`, `link`, `ln`, `ls`, `mkdir`, `mv`, `nproc`, `pgrep`, `ps`, `pwd`, `realpath`, `rm`, `rmdir`, `sed`, `sh`, `sleep`, `stty`, `sync`, `tar`, `test`, `timeout`, `touch`, `true`, `unlink`, `vi` |
+| Links (7) | `[` = `test`, `egrep` = `grep`, `fgrep` = `grep`, `gunzip` = `gzip`, `gzcat` = `gzip`, `zcat` = `gzip`, `pkill` = `pgrep` |
 
-`sh` is OxideBSD's own shell (`lib/libsh`). `vi` is OpenVi (`bin/vi`). `ash` remains for autoconf
-`configure` scripts and as `/sbin/emergency`'s fallback shell.
+`sh` is OxideBSD's own shell (`lib/libsh`). `vi` is OpenVi (`bin/vi`). The rest are Rust `std`
+programs; `grep`, `sed`, `ed` and `expr` share `lib/libregex`, `gzip` and `tar` share `lib/libz`.
 
-## 3. `/sbin` (25 entries)
+## 3. `/sbin` (30 entries)
 
 | Source | Programs |
 |--------|----------|
-| Native (`sbin/`, 16) | `dmesg`, `emergency`, `fsck`, `fsck_oxfs`, `init`, `init_sh`, `lsoxmod`, `mount`, `newfs_oxfs`, `nologin`, `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount`, `update` |
+| Native (`sbin/`, 21) | `adjkerntz`, `dmesg`, `emergency`, `fsck`, `fsck_msdosfs`, `fsck_oxfs`, `init`, `init_sh`, `lsoxmod`, `mknod`, `mount`, `newfs_msdos`, `newfs_oxfs`, `nologin`, `ping` (set-user-ID root, mode 4555), `rcorder`, `reboot`, `shutdown`, `sysctl`, `umount`, `update` |
 | Third-party (1) | `zstd` (`external/bsd/zstd`, static, so a set archive unpacks before `/usr` exists; `RAM_FLOOR.md` §4.3.4) |
-| Links (6) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `lsmod` -> `lsoxmod`, `unzstd` = `zstd`, `zstdcat` = `zstd` |
-| BusyBox (2) | `mknod`, `ping` |
+| Links (8) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `mount_tmpfs` = `mount`, `mount_msdosfs` = `mount`, `lsmod` -> `lsoxmod`, `unzstd` = `zstd`, `zstdcat` = `zstd` |
 
 `init_sh` is the non-interactive interpreter for `/etc/rc` and `/etc/rc.d/*` (`INIT_SH.md`).
 
-Not yet present, and expected here: `ifconfig` and `route` (need interface-configuration ioctls).
+Not yet present, and expected here: `ifconfig`, `route` and `dhclient`.
 
 ## 4. `/usr/bin` (127 entries)
 

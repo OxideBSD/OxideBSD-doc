@@ -21,7 +21,9 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| `RLIMIT_CORE` is stored, not enforced: there are no core dumps. `RLIMIT_CPU` and `RLIMIT_RSS` aren't either. Anonymous memory is allocated when it's mapped, not on first touch (`VMMAP.md` step 3). | Real core dumps; memory on demand | v0.3.0 |
+| `RLIMIT_CPU` and `RLIMIT_RSS` are stored, not enforced. Anonymous memory is allocated when it's mapped, not on first touch (`VMMAP.md` step 3). | Enforced limits; memory on demand | v0.3.0 |
+| A core signal sent by another process (`kill -SEGV`, a terminal's `SIGQUIT`) kills without a core: only a process that takes the signal itself dumps one. | Every core-signal death dumps | v0.3.0 |
+| `/proc/<pid>/stat` leaves out rss, flags, fault counts, pending signals and the thread count; there is no `/proc/<pid>/environ`, no wait channel and no boot time, so `ps` prints `-` for them. | The full process information | v0.3.0 |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 
 ## 4. Files and descriptors
@@ -44,6 +46,7 @@ fix lands, the row moves to §8 with its commit.
 |---|---|---|
 | The guest's IP address and gateway are compiled in; no `ifconfig`, no DHCP client. | Configured at boot (`rc.conf`) | v0.3.0 (`INIT.md`: `ifconfig_*`) |
 | A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces (`lo0`, `rl0`) configured at build time. | A routing table and `ifconfig`/`route` | later |
+| `IP_TTL`, `IP_TOS` and binding a raw socket are accepted and ignored; there is no `IP_DONTFRAG`. | The IP-level socket options | v0.3.0 |
 | Incoming packets are processed only by processes waiting in the network stack: the rtl8139 interrupt only sets a flag and wakes waiters, and a wait involving a socket wakes every 50 ms to drive the NIC. | Interrupt-driven receive | v0.3.0 |
 | TCP is stop-and-wait with a fixed 536-byte segment size, no window or congestion control. | Real TCP | later |
 | No IPv6. | IPv6 | later |
@@ -53,14 +56,17 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | No mfsroot: a boot with no disk has no root file system to install or recover from. | A small mfsroot loaded beside the kernel | v0.3.0 (`RAM_FLOOR.md` piece C) |
-| BusyBox applets are 111 separate static binaries at fixed load addresses; `/bin`'s text, archive and process tools (`grep`, `sed`, `ed`, `expr`, `gzip`, `tar`, `ps`, `pgrep`, `ping`, ...) are still among them. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
+| BusyBox's 96 applets (all in `/usr`) are separate static binaries at fixed load addresses. | One position-independent multi-call binary | v0.3.0 |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
-| msdosfs keeps out of the name cache (`VFCF_NOCACHE`): a case-insensitive lookup would cache the case the caller used, and `getcwd` reports it. Every msdosfs lookup reads the directory. | The cache folds case for such mounts | v0.4.0 |
 
 ## 8. History
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-18 — BusyBox's `grep sed ed expr gzip tar ps pgrep ping` (and their links): Rust `std` rewrites over `lib/libregex` and `lib/libz`; `ash` removed; nothing BusyBox left in `/bin` or `/sbin` — 5812226
+- 2026-10-18 — msdosfs kept out of the name cache: the cache folds case for `VFCF_CASEFOLD` types — ac07e69
+- 2026-10-18 — `RLIMIT_CORE` stored, no core dumps, every signal death reporting `WCOREDUMP`: ELF core files (`kern.corefile`, `kern.sugid_coredump`) — 1bb4500
+- 2026-10-18 — any user could open a raw ICMP socket: root only, `ping` set-user-ID — 4283e18
 - 2026-10-18 — no map of a process's mappings: anonymous `mmap` from one system-wide bump pointer, `munmap`/`MAP_FIXED` blind to part of a mapping, `RLIMIT_AS` unenforced: a per-address-space `vm_map` (`VMMAP.md` steps 1, 2, 4) — d561158
 - 2026-10-18 — `/bin`'s oxlibc utilities and BusyBox's `date dd df hostname mknod realpath stty timeout`: Rust `std` rewrites — 9d80771
 - 2026-10-18 — the libc crate fork used Linux's `SYS_*` numbers and Linux musl's `struct statvfs`: OxideBSD's own — 2216b96
