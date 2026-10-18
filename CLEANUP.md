@@ -22,8 +22,6 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | `RLIMIT_AS` and `RLIMIT_CORE` are stored, not enforced: there is no map of a process's regions to measure (anonymous `mmap` takes address space from one system-wide bump pointer, never reused, and allocates every page at once), and no core dumps. `RLIMIT_CPU` and `RLIMIT_RSS` aren't either. | Enforced, over a per-process `vm_map` and real core dumps | v0.3.0 |
-| `nice`/`setpriority` stored, no effect on scheduling. | Affects scheduling | later |
-| `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` returns an all-zero `struct rusage`. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 
 ## 4. Files and descriptors
@@ -31,7 +29,6 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | devfs has no rulesets: every view shows every device. | FreeBSD's `devfs(8)`/`devfs.rules(5)`, per-view hide and unhide | with jails |
-| `reboot(2)` always writes delayed blocks (its Linux magic numbers carry no `RB_NOSYNC`), so `reboot -q -n` syncs anyway. | `RB_NOSYNC` honoured | later |
 | Disk writes from mapping, exec, close and other non-syscall paths into oxfs still poll the disk with interrupts masked (`fslock::Guard::for_call`); only syscall dispatch and descriptor reads and writes sleep. | Every path sleeps | v0.5.0 (SMP rework) |
 | One data disk, found once at boot; the memory disk has no `/dev` node. | A block layer with every disk | later |
 | A mounted disk never picks up a newer build's files; only a reformat does. | An installer and upgrades | later (v0.10.0, packages) |
@@ -59,16 +56,16 @@ fix lands, the row moves to §8 with its commit.
 | BusyBox applets are 119 separate static binaries at fixed load addresses. | A multi-call binary, or native replacements | v0.3.0 (native `bin/` rewrite as `std` apps) |
 | The C ports built from their own build systems (BusyBox, bmake, vi, nano, ninja, doom, the POSIX corpus) link at fixed addresses whose floor has to move as the kernel grows. | Position-independent executables | v0.3.0 |
 | After a partial `MAP_FIXED` over a file mapping (as `ld.so` does), the old region's record is kept whole, so a fault there can be reported as `SIGBUS` rather than `SIGSEGV`. | Regions split on overlap | later |
-| The `libc` crate fork uses Linux's `SYS_*` numbers for OxideBSD (only `SYS_getrandom` is corrected), so a Rust crate calling `libc::syscall` directly reaches the wrong syscall for anything musl remaps. | The table matches the kernel | v0.3.0 |
-| The `libc` crate fork's `struct statvfs` is Linux musl's (no `f_type`; and since VFS step 2d, none of the mount names OxideBSD's musl adds), so a Rust crate calling `libc::statvfs` gets a short buffer filled long. No Rust code here calls it. | The struct matches musl's | v0.3.0 |
-| Only `passwd(1)` changes `/etc/master.passwd` and `/etc/passwd` (through `pam_unix`); no tool adds or removes users or groups (`adduser`, `pw`, `vipw`). | They can | v0.3.0 |
-| `touch(1)` (`bin/touch`) takes only `-c`: `-t`, `-d`, `-r`, `-a`, `-m` are missing, and an unknown flag is taken for a file name (`touch -t 2020... f` makes a file `-t`'s argument names). Found while testing msdosfs (VFS step 4d). | POSIX's flags; unknown ones refused | v0.3.0 |
 | msdosfs keeps out of the name cache (`VFCF_NOCACHE`): a case-insensitive lookup would cache the case the caller used, and `getcwd` reports it. Every msdosfs lookup reads the directory. | The cache folds case for such mounts | v0.4.0 |
 
 ## 8. History
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-18 — the libc crate fork used Linux's `SYS_*` numbers and Linux musl's `struct statvfs`: OxideBSD's own — 2216b96
+- 2026-10-18 — no tool but `passwd(1)` could change the account database: `useradd` family, `pw(8)`, `vipw(8)`, `adduser(8)`, `rmuser(8)` — f7579fa
+- 2026-10-18 — `touch(1)` took only `-c`: POSIX's `-a -c -m -r -t -d` — e61dbca
+- 2026-10-18 — `nice` had no effect on scheduling; `times`/`getrusage` reported no system time (and `getrusage` nothing); `reboot -q -n` synced anyway: the 4BSD scheduler, a user/system split, `RB_NOSYNC` — bc62a1c
 - 2026-10-18 — `flock` failed with `EAGAIN` instead of waiting; the kernel reaped orphans adopted by pid 1 instead of init; a restarted pid 1 was read from disk while running as the retired one: `flock` waits (`EINTR` on a signal), init reaps every orphan with `waitpid`, pid 1 reads its program in its own context (FreeBSD's `start_init`) — d486876
 - 2026-10-17 — `setrlimit` stored limits without enforcing them and without checking them (a soft limit above the hard one, any user raising a hard one); `SCM_RIGHTS` ignored `RLIMIT_NOFILE`; the lowest free fd was a walk over the open ones: `STACK`, `DATA`, `FSIZE`, `NPROC` and `NOFILE` enforced, POSIX's `EINVAL`/`EPERM`, `EMSGSIZE` with the rights discarded, a two-level fd bitmap — aba24c9
 - 2026-10-17 — tmpfs, devfs and `/dev/shm` were oxfs's: one memory pool for every tmpfs mount and devfs (one `st_dev`, `rename` between it and the disk moved the entry instead of `EXDEV`), the memory devices oxfs's descriptors: tmpfs and devfs modules of their own, the devices the kernel's, `/dev/shm` a tmpfs from `fstab` (`VFS.md` steps 3a-3c) — 338d6d0, fe0e363, a27ca0d
