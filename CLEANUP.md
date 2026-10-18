@@ -22,8 +22,7 @@ fix lands, the row moves to §8 with its commit.
 | Shortcut today | A regular OS | Target |
 |---|---|---|
 | An orphan reparented to pid 1 is reaped by the kernel at exit (`Process::adopted`, treated like `SA_NOCLDWAIT`), although `/sbin/init` now reaps with `waitpid(-1, WNOHANG)`. | init reaps orphans | v0.3.0 |
-| `setrlimit` limits are stored, never enforced (only `RLIMIT_MEMLOCK`, for `mlockall(MCL_FUTURE)`, and `RLIMIT_NOFILE`). | Enforced | v0.3.0 (the ones that matter: `STACK`, `AS`, `CORE`) |
-| `setrlimit` accepts a soft limit above the hard one, and lets any user raise a hard limit. | `EINVAL`; raising a hard limit needs privilege | v0.3.0 |
+| `RLIMIT_AS` and `RLIMIT_CORE` are stored, not enforced: there is no map of a process's regions to measure (anonymous `mmap` takes address space from one system-wide bump pointer, never reused, and allocates every page at once), and no core dumps. `RLIMIT_CPU` and `RLIMIT_RSS` aren't either. | Enforced, over a per-process `vm_map` and real core dumps | v0.3.0 |
 | `nice`/`setpriority` stored, no effect on scheduling. | Affects scheduling | later |
 | `times()` reports `tms_stime`/`tms_cstime` as zero; `getrusage` returns an all-zero `struct rusage`. | Real user/system split | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
@@ -32,8 +31,6 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| Finding a process's lowest free fd is linear in its open files. | An fd bitmap per process | v0.3.0 |
-| Descriptors received with `SCM_RIGHTS` aren't checked against `RLIMIT_NOFILE` (`fd::install_held`). | Refused past the limit (FreeBSD: `EMSGSIZE`, the rights discarded) | v0.3.0 |
 | `flock` fails with `EAGAIN` instead of blocking without `LOCK_NB`. | Blocks | v0.3.0 |
 | devfs has no rulesets: every view shows every device. | FreeBSD's `devfs(8)`/`devfs.rules(5)`, per-view hide and unhide | with jails |
 | `reboot(2)` always writes delayed blocks (its Linux magic numbers carry no `RB_NOSYNC`), so `reboot -q -n` syncs anyway. | `RB_NOSYNC` honoured | later |
@@ -75,6 +72,7 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-17 — `setrlimit` stored limits without enforcing them and without checking them (a soft limit above the hard one, any user raising a hard one); `SCM_RIGHTS` ignored `RLIMIT_NOFILE`; the lowest free fd was a walk over the open ones: `STACK`, `DATA`, `FSIZE`, `NPROC` and `NOFILE` enforced, POSIX's `EINVAL`/`EPERM`, `EMSGSIZE` with the rights discarded, a two-level fd bitmap — aba24c9
 - 2026-10-17 — tmpfs, devfs and `/dev/shm` were oxfs's: one memory pool for every tmpfs mount and devfs (one `st_dev`, `rename` between it and the disk moved the entry instead of `EXDEV`), the memory devices oxfs's descriptors: tmpfs and devfs modules of their own, the devices the kernel's, `/dev/shm` a tmpfs from `fstab` (`VFS.md` steps 3a-3c) — 338d6d0, fe0e363, a27ca0d
 - 2026-10-16 — `/proc` was matched by path prefix inside oxfs, `fstat` of FIFOs, terminals and devices answered by oxfs's nodes, oxfs kept its own open-file table: the kernel's VFS (`VFS.md` step 2) — 80ba24b, dcf4f5d
 
