@@ -118,7 +118,8 @@ node gives each one's kind (`disk`, `cd`, `memory`), size, sector size and model
 
 6.1. A new file system module, `cd9660` (FreeBSD's name), read-only: ISO 9660 with Rock Ridge
 (POSIX names, modes, symlinks) and, without Rock Ridge, Joliet names, then plain 8.3 names. It
-registers a `VfsConf` as the others do and is mounted with `mount -t cd9660 /dev/cd0 /mnt`.
+registers a `VfsConf` as the others do and is mounted with `mount -t cd9660 /dev/ide0 /mnt` (the
+drive's bus name, §5.1).
 
 6.2. It serves `vop_lookup`, `vop_readdir`, `vop_getattr`, `vop_read`, `vop_readlink` and
 `vop_strategy` (file data is contiguous extents), and refuses every write with `EROFS`.
@@ -204,6 +205,12 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
 Progress: step 1 done (2026-10-18): the registry, `kern.disks`/`kern.disk.<name>`, IDE on all
 four positions with per-channel DMA and LBA48, every virtio-blk unit; its test is part of
 `tests/devfs_syscall_smoke.rs` (two virtio-blk disks and a 130 GiB IDE disk beside the system's).
+Step 2 done (2026-10-18): ATAPI over the IDE driver (PIO packet commands, a disc's size checked
+again at each open and mount, the tray locked while mounted, a hybrid image's partitions read on
+a CD too), cd9660 (`sys/modules/cd9660` over `lib/libcd9660`: Rock Ridge, Joliet, plain names,
+`norrip`/`nojoliet`), `cd9660(5)`; test `tests/cd9660_syscall_smoke.rs` (three discs and an empty
+drive on IDE). Not yet exercised by a test: a disc changing under a running system, Rock Ridge's
+relocated directories (xorriso doesn't relocate), files of several extents.
 
 ## 12. Open questions
 
