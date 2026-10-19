@@ -23,6 +23,7 @@ fix lands, the row moves to §8 with its commit.
 |---|---|---|
 | `RLIMIT_RSS` is stored and reported, not enforced: with no paging out there is nothing to enforce it with (Linux ignores it too). | Enforced with a pager | later (with swap) |
 | A core signal sent to a process blocked in the kernel or stopped kills it without a core (a running one dumps its own). | Every core-signal death dumps | later |
+| `mmap(MAP_SHARED|MAP_ANON)` is mapped as private memory: after `fork` parent and child no longer see each other's writes. | Shared anonymous memory (frames shared, reference-counted) | v0.3.0 |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 
 ## 4. Files and descriptors
