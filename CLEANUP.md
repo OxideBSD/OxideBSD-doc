@@ -21,9 +21,8 @@ fix lands, the row moves to §8 with its commit.
 
 | Shortcut today | A regular OS | Target |
 |---|---|---|
-| `RLIMIT_CPU` and `RLIMIT_RSS` are stored, not enforced. | Enforced limits | v0.3.0 |
-| A core signal sent by another process (`kill -SEGV`, a terminal's `SIGQUIT`) kills without a core: only a process that takes the signal itself dumps one. | Every core-signal death dumps | v0.3.0 |
-| `/proc/<pid>/stat` leaves out rss, flags, fault counts, pending signals and the thread count; there is no `/proc/<pid>/environ`, no wait channel and no boot time, so `ps` prints `-` for them. | The full process information | v0.3.0 |
+| `RLIMIT_RSS` is stored and reported, not enforced: with no paging out there is nothing to enforce it with (Linux ignores it too). | Enforced with a pager | later (with swap) |
+| A core signal sent to a process blocked in the kernel or stopped kills it without a core (a running one dumps its own). | Every core-signal death dumps | later |
 | No kernel-mode preemption, and a syscall runs with interrupts masked for its whole duration: a long disk write freezes the machine. | Preemptible kernel, interruptible I/O | later (with SMP, v0.5.0) |
 
 ## 4. Files and descriptors
@@ -46,7 +45,7 @@ fix lands, the row moves to §8 with its commit.
 |---|---|---|
 | A fixed route lookup (loopback, the connected subnet, one default gateway); two interfaces, one address each; `route` sets only the default. | A routing table, aliases, more interfaces | later |
 | `dhclient` takes the first offer, sends no `DHCPDECLINE`, doesn't ARP-check the address, and has no configuration file. | ISC/OpenBSD-level client | later |
-| `IP_TTL`, `IP_TOS` and binding a raw socket are accepted and ignored; there is no `IP_DONTFRAG`. | The IP-level socket options | v0.3.0 |
+| TCP segments carry the stack's TTL and TOS whatever the socket's `IP_TTL`/`IP_TOS`. | Per-connection header options | later (real TCP) |
 | TCP is stop-and-wait with a fixed 536-byte segment size, no window or congestion control. | Real TCP | later |
 | No IPv6. | IPv6 | later |
 
@@ -60,6 +59,11 @@ fix lands, the row moves to §8 with its commit.
 
 Removed shortcuts, as `date — item — commit`.
 
+- 2026-10-18 — `/proc/<pid>/stat` without rss, faults, thread count or signal masks; no `environ`, `wchan` or `btime`: all reported — f161898
+- 2026-10-18 — `RLIMIT_CPU` stored, not enforced: `SIGXCPU`, then `SIGKILL` — f161898
+- 2026-10-18 — a core signal from another process killed without a core: a running target dumps its own — b8b9f19
+- 2026-10-18 — `IP_TTL`, `IP_TOS` and raw-socket `bind` ignored, no DF: in the headers UDP and raw sockets send — 022ee54
+- 2026-10-18 — no `MAP_EXCL`/`MAP_FIXED_NOREPLACE` (`VMMAP.md` §4.3) — f161898
 - 2026-10-18 — BusyBox as 96 static fixed-address binaries; bmake, vi, nano, ninja, doom and the POSIX corpus at fixed addresses under a moving floor: one multi-call PIE BusyBox, PIE ports — 4e7df04
 - 2026-10-18 — anonymous memory and the heap allocated when mapped: made at first touch (`VMMAP.md` step 3) — 62216c8
 - 2026-10-18 — rl0's address and gateway compiled in, no `ifconfig`, no DHCP: interface ioctls, `net.inet.ip.default_gateway`, `ifconfig`/`route`/`dhclient`, `rc.d/netif` from `ifconfig_rl0` — 47aca9a, 3b3a6d4
