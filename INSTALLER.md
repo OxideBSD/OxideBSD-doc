@@ -1,7 +1,6 @@
 # OxideBSD install medium and installer: design specification
 
-Status: **draft** (2026-10-18), for review. The decisions in §13 are the user's; the open
-questions are in §12.
+Status: **accepted** (2026-10-18), with the user's answers to the open questions (§12, §13).
 Asked for by `CLEANUP.md` §7 (no mfsroot), `RAM_FLOOR.md` §5 (piece C) and §4 (one data disk,
 found once).
 
@@ -79,20 +78,21 @@ target disk's partitions visible in `/dev`, its file systems mountable.
 ## 5. Disks: the registry and drivers
 
 5.1. **Every disk the kernel drives is registered** at boot (`sys/drivers/disk.rs` grows from
-"one disk" to a list), with its partitions, each a block device and a `/dev` node. Names by
-driver, as the BSDs do, replacing today's bus names:
+"one disk" to a list), with its partitions, each a block device and a `/dev` node. Devices keep
+today's naming by bus (decided §12): one counter per bus, in probe order, disks and optical
+drives alike.
 
-| Driver | Disks | CD/DVD |
-|---|---|---|
-| virtio-blk | `vtbd0` | |
-| IDE (ATA/ATAPI) | `ada0` | `cd0` |
-| AHCI (SATA) | `ada1`, ... | `cd1`, ... |
-| virtio-scsi | `da0` | `cd2`, ... |
-| USB mass storage | `da1`, ... | |
-| memory disk | `md0` | |
+| Driver | Names |
+|---|---|
+| virtio-blk | `virt0`, `virt1`, ... |
+| IDE (ATA and ATAPI) | `ide0`, ... |
+| AHCI (SATA) | `sata0`, ... |
+| virtio-scsi | `scsi0`, ... |
+| USB mass storage | `usb0`, ... |
+| memory disk | `md0` |
 
-Numbers are given in probe order across drivers sharing a name. Partitions are `<disk>p<N>` (GPT)
-or `<disk>s<N>` (MBR), as today.
+Whether a device is an optical drive is in its kind (`kern.disks`, §5.5), not its name.
+Partitions are `<disk>p<N>` (GPT) or `<disk>s<N>` (MBR), as today.
 
 5.2. The root is still chosen as today (`/boot/fsconf`, else the first oxfs partition), from all
 registered disks; `mfsroot` selects `md0`.
@@ -111,6 +111,9 @@ registered disks; `mfsroot` selects `md0`.
 5.4. A CD's block device reports 2048-byte sectors; the block layer (`vfs_bdev`, `vfs_bio`) MUST
 handle a device sector size other than 512.
 
+5.5. `kern.disks` (FreeBSD's sysctl) lists the registered disks, and a new `kern.disk.<name>`
+node gives each one's kind (`disk`, `cd`, `memory`), size, sector size and model.
+
 ## 6. cd9660
 
 6.1. A new file system module, `cd9660` (FreeBSD's name), read-only: ISO 9660 with Rock Ridge
@@ -125,9 +128,9 @@ registers a `VfsConf` as the others do and is mounted with `mount -t cd9660 /dev
 7.1. The console MUST support more layouts than US 104: the layouts `pc-keyboard` ships (US,
 UK, German, French AZERTY, Dvorak, Colemak, JIS), for PS/2 and the USB HID keyboard alike.
 
-7.2. Chosen by `keymap="<name>"` in `rc.conf` (FreeBSD's variable, through `rc.d/syscons`-like
-`rc.d/keymap`) and at run time by `kbdcontrol -l <name>` (FreeBSD's tool), over a new console
-ioctl.
+7.2. Set at run time by `wsconsctl keyboard.encoding=<name>` (NetBSD's and OpenBSD's tool and
+names: `us`, `uk`, `de`, `fr`, `us.dvorak`, `us.colemak`, `jp`), over a new console ioctl, and at
+boot from `/etc/wsconsctl.conf` by `rc.d/wsconsctl` (decided §12).
 
 ## 8. Partitioning
 
@@ -137,7 +140,8 @@ partitions after a change (a `DIOCGPARTRESCAN`-style ioctl on the disk's node).
 
 8.2. The editor (in the installer, §9) MUST: show every disk and its partitions and free space;
 create, delete and resize partitions (a resize only into adjacent free space, and an oxfs
-partition only grown, with `growfs`-style help from `newfs_oxfs` if needed); keep existing
+partition only grown, with `growfs`-style help from `newfs_oxfs` if needed; other systems' file
+systems are never resized: the user makes room with their own tools first, decided §12); keep existing
 partitions untouched (dual boot); set types: oxfs, EFI system, BIOS boot, swap, other.
 
 8.3. Several oxfs partitions MAY be made for `/`, `/usr`, `/var`, `/home`; each is written to
@@ -199,14 +203,8 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
 
 ## 12. Open questions
 
-1. Device names (§5.1): the BSD-style `vtbd`/`ada`/`da`/`cd` names replace today's `virt0`/
-   `ide0`. `fstab` names the root by its GPT label (`/dev/gpt/rootfs`) and nothing in the tree
-   names `/dev/virt0`, so nothing breaks. Rename, or keep bus names for the new drivers too
-   (`sata0`, `usb0`, `scsi0`)?
-2. Keymap tool (§7.2): FreeBSD's `kbdcontrol -l`, or NetBSD/OpenBSD's `wsconsctl
-   keyboard.encoding=`?
-3. Resizing (§8.2): only into free space, and only growing oxfs, or also shrinking other
-   file systems (FAT, NTFS) to make room, as some installers do?
+None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keymap tool is
+`wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
 
