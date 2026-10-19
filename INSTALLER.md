@@ -211,6 +211,12 @@ a CD too), cd9660 (`sys/modules/cd9660` over `lib/libcd9660`: Rock Ridge, Joliet
 `norrip`/`nojoliet`), `cd9660(5)`; test `tests/cd9660_syscall_smoke.rs` (three discs and an empty
 drive on IDE). Not yet exercised by a test: a disc changing under a running system, Rock Ridge's
 relocated directories (xorriso doesn't relocate), files of several extents.
+Step 3 done (2026-10-19): virtio-scsi (`sys/drivers/virtio_scsi.rs`) under a shared SCSI command
+layer (`sys/drivers/scsi.rs`: INQUIRY, TEST UNIT READY, READ CAPACITY(10/16), READ/WRITE(10/16),
+SYNCHRONIZE CACHE, medium lock) that ATAPI now uses too; every target's LUN 0 registered as
+`scsi<N>`, disks and CDs; disks of 4096-byte sectors (their GPT counted in them; `mkimg -S`). The
+kernel now reads the medium it booted from under QEMU (`scsi0`). Tested in
+`cd9660_syscall_smoke`.
 
 ## 12. Open questions
 
