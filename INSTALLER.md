@@ -201,6 +201,10 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
    installed disk boots to a login prompt on BIOS and on UEFI; a second test installs beside an
    existing partition and checks it untouched.
 
+Progress: step 1 done (2026-10-18): the registry, `kern.disks`/`kern.disk.<name>`, IDE on all
+four positions with per-channel DMA and LBA48, every virtio-blk unit; its test is part of
+`tests/devfs_syscall_smoke.rs` (two virtio-blk disks and a 130 GiB IDE disk beside the system's).
+
 ## 12. Open questions
 
 None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keymap tool is

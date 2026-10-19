@@ -48,9 +48,11 @@ other driver.
 
 3.5. Device numbers are kept as they are (Linux's where one exists): `null` (1, 3), `zero`
 (1, 5), `random` (1, 8), `urandom` (1, 9), `ttyv<n>` (4, n), `tty` (5, 0), `console` (5, 1),
-`klog` (7, 0), `fb0` (29, 0); the data disk and its partitions, `ide0` (3, 0) and
-`ide0p<N>`/`ide0s<N>` (3, N), `virt0` (252, 0) and `virt0p<N>`/`virt0s<N>` (252, N)
-(`RAM_FLOOR.md` §3.4.5).
+`klog` (7, 0), `fb0` (29, 0); the disks (`INSTALLER.md` §5), one major per driver and minor
+`unit << 8` for a whole disk, `unit << 8 | N` for its partition N: `ide<u>` (3, u << 8) and
+`ide<u>p<N>`/`ide<u>s<N>` (3, u << 8 | N), `virt<u>` (252, u << 8) and its partitions likewise,
+`gpt/<label>` (253, in the order found). Numbers are in musl's `makedev` encoding (`st_rdev`),
+whose minor has 20 bits.
 
 ## 4. devfs
 
