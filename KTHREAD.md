@@ -172,6 +172,11 @@ Progress: step 1 done (2026-10-21): `sys/kern/kern_kthread.rs` (`kthread_add`, `
 (`BlockReason::KernelSleep`), the kernel band (`sched_4bsd::PRI_KERN`), `EPERM` from `kill`,
 `sigqueue`, `setpriority`, `sched_setscheduler`, `sched_setparam` and `procctl`, kernel-posted
 signals discarded. Kernel threads' ids skip 1. Tested in `kern_syscall_smoke` (section `kthread`).
+Step 2 done (2026-10-21): `sys/kern/subr_taskqueue.rs` (`Task`, `enqueue`, `drain`, `create`,
+`start_threads`; `TASKQUEUE_THREAD` and its `taskq` thread, started after pid 1). Tested in
+`kern_syscall_smoke`: coalesced enqueues (`pending` 3), an enqueue from an interrupt handler (IRQ
+13 raised with `int`), a task enqueued again while it runs, `drain` over a sleeping task, a queue of
+one's own.
 
 ## 11. Decisions
 
