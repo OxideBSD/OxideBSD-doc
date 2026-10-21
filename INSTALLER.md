@@ -80,19 +80,25 @@ target disk's partitions visible in `/dev`, its file systems mountable.
 5.1. **Every disk the kernel drives is registered** at boot (`sys/drivers/disk.rs` grows from
 "one disk" to a list), with its partitions, each a block device and a `/dev` node. Devices keep
 today's naming by bus (decided §12): one counter per bus, in probe order, disks and optical
-drives alike.
+drives alike; except AHCI, named by where the drive is plugged in (decided §13).
 
 | Driver | Names |
 |---|---|
 | virtio-blk | `virt0`, `virt1`, ... |
 | IDE (ATA and ATAPI) | `ide0`, ... |
-| AHCI (SATA) | `sata0`, ... |
+| AHCI (SATA) | `sata<C>.<P>`, `sata<C>.<P>.<M>` |
 | virtio-scsi | `scsi0`, ... |
 | USB mass storage | `usb0`, ... |
 | memory disk | `md0` |
 
 Whether a device is an optical drive is in its kind (`kern.disks`, §5.5), not its name.
 Partitions are `<disk>p<N>` (GPT) or `<disk>s<N>` (MBR), as today.
+
+An AHCI drive's name is its controller `C` (in PCI order, from 0), its port `P` (0-31, as the
+controller numbers them) and, behind a port multiplier, the multiplier's port `M` (0-14):
+`sata0.3`, `sata0.3.2`. The name stays with the connector: an empty port leaves a gap, and a
+drive moved to another port changes name (`/etc/fstab` and `/boot/fsconf` name a GPT label for
+that reason).
 
 5.2. The root is still chosen as today (`/boot/fsconf`, else the first oxfs partition), from all
 registered disks; `mfsroot` selects `md0`.
@@ -104,7 +110,15 @@ registered disks; `mfsroot` selects `md0`.
 - **virtio-scsi**: the virtio transport `virtio.rs` already has, SCSI `READ(10)`/`WRITE(10)` for
   disks and CDs.
 - **AHCI**: SATA disks (read-write) and ATAPI optical drives, with DMA and interrupt completion
-  as the IDE and virtio drivers have.
+  as the IDE and virtio drivers have, one command at a time per controller (no NCQ until the
+  block layer issues concurrent I/O). It takes the controller from the firmware first (BIOS/OS
+  handoff) where the controller offers that; a controller without 64-bit addressing gets DMA
+  memory below 4 GiB; drives behind a port multiplier are registered too (command-based
+  switching). **Hot plug**: a drive plugged into a port is registered under the port's name, a
+  drive pulled out is retired (its file systems unmounted by force, as a CD's when its disc
+  goes, open descriptors failing with `EIO`). That work sleeps and allocates, so it runs in a
+  kernel thread the controller's interrupt wakes, not in the interrupt (kernel threads: a design
+  of their own, built before hot plug).
 - **USB mass storage**: bulk-only transport and SCSI over the existing xHCI driver (bulk
   endpoints are new there), for USB sticks and disks.
 
@@ -112,7 +126,8 @@ registered disks; `mfsroot` selects `md0`.
 handle a device sector size other than 512.
 
 5.5. `kern.disks` (FreeBSD's sysctl) lists the registered disks, and a new `kern.disk.<name>`
-node gives each one's kind (`disk`, `cd`, `memory`), size, sector size and model.
+node gives each one's kind (`disk`, `cd`, `memory`), size, sector size and model. A dot in a
+disk's name is a level of the tree: `kern.disk.sata0.3.kind`.
 
 ## 6. cd9660
 
@@ -192,7 +207,9 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
    IDE disk all visible.
 2. **ATAPI** and **cd9660** (§5.3, §6); test: an ISO on an IDE CD mounted and read.
 3. **virtio-scsi**; test: the same on virtio-scsi.
-4. **AHCI**; test: QEMU's `ich9-ahci` with a disk and a CD.
+4. **AHCI**; test: QEMU's `ich9-ahci` with a disk and a CD. Then kernel threads, then AHCI hot
+   plug. QEMU emulates neither hot plug on AHCI ("Bus 'ahci.1' does not support hotplugging")
+   nor port multipliers: those are tried on real hardware.
 5. **USB mass storage**; test: QEMU's `usb-storage` stick.
 6. **md from the mfsroot** and **the install medium** (§3, §4); test: boot it, reach the
    installer's first screen headlessly (serial).
@@ -217,6 +234,13 @@ SYNCHRONIZE CACHE, medium lock) that ATAPI now uses too; every target's LUN 0 re
 `scsi<N>`, disks and CDs; disks of 4096-byte sectors (their GPT counted in them; `mkimg -S`). The
 kernel now reads the medium it booted from under QEMU (`scsi0`). Tested in
 `cd9660_syscall_smoke`.
+Step 4 done (2026-10-20), except hot plug: AHCI (`sys/drivers/ahci.rs`): disks by DMA (LBA48, else
+28-bit), ATAPI drives as SCSI transports, every controller and implemented port, BIOS/OS handoff,
+32-bit DMA memory where the controller lacks 64-bit addressing, port multipliers; the system's disk
+may be one (`OXIDEBSD_QEMU_DISK=sata`). Tested in `cd9660_syscall_smoke` (two controllers: a disk
+with a file system, a 130 GiB disk, a disc and an empty drive). Not exercised by a test: port
+multipliers (QEMU has none), the handoff and 32-bit DMA (QEMU's controller needs neither), 28-bit
+disks, sectors other than 512 bytes (QEMU's ATA disks have only those).
 
 ## 12. Open questions
 
@@ -232,3 +256,8 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
   users; a partition editor for GPT and MBR that keeps other systems, makes several oxfs
   partitions and a swap partition; one hybrid ISO; drivers for ATAPI, virtio-scsi, USB mass
   storage and AHCI.
+- 2026-10-20 (user): AHCI drives named by controller, port and multiplier port
+  (`sata<C>.<P>[.<M>]`, nested in `kern.disk`); one command at a time; BIOS/OS handoff, 32-bit
+  DMA fallback, port multipliers and hot plug all in; removing a mounted drive unmounts it by
+  force; hot plug's work in real kernel threads (a separate design, before hot plug); hot plug
+  and port multipliers checked on the Mac mini later, not in QEMU.
