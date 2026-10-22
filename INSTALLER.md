@@ -122,6 +122,39 @@ registered disks; `mfsroot` selects `md0`.
 - **USB mass storage**: bulk-only transport and SCSI over the existing xHCI driver (bulk
   endpoints are new there), for USB sticks and disks.
 
+AHCI hot plug in detail (decided 2026-10-22):
+
+- After boot's probe, each implemented port's `PxIE` adds port connect change (`PCS`) and PhyRdy
+  change (`PRCS`), their boot-time status cleared first. The interrupt handler clears the
+  `PxSERR` bits behind them (`DIAG.X`, `DIAG.N`: the interrupt is level-triggered and stays
+  asserted until they're clear) and enqueues the port's task, one static task per port, on
+  `taskqueue_thread` (`KTHREAD.md` §9).
+- **Port multipliers report their own ports' changes** by asynchronous notification: at probe a
+  multiplier has notification enabled (`GSCR[96]` bit 3) for PhyRdy changes on its ports
+  (`GSCR[33]` bit 16). Its Set Device Bits FIS with the notification bit (`PxSNTF` with
+  `CAP.SSNTF`, else the received SDB FIS) enqueues the port's task too, which reads `GSCR[32]`
+  for the multiplier ports that changed, clears their `PSCR[1]`, and handles each as below.
+- The task waits 500 ms for the link to settle (`pause`; the enqueues it absorbs meanwhile
+  coalesce), takes the giant lock (`fslock`), then: link down, the port's drives are retired (all
+  of a multiplier's when it goes); link up with nothing registered, the port is brought up and
+  probed as at boot, sleeping rather than spinning while the drive spins up, and what answers is
+  registered; link up and registered, the drive is identified again and, if its model, serial
+  number or size differ, the old drive is retired and the new one registered (a reset of the
+  driver's own also signals a change: an unchanged drive is left alone).
+- **Retiring a drive**: every file system on its devices is unmounted by force (descriptors on
+  them go to deadfs: `EIO`), its raw `/dev` descriptors fail with `EIO`, its nodes and block
+  devices go. Its registry entry stays: a drive plugged into the same place gets that entry back,
+  with the same name and device numbers.
+- **The root's drive** going panics by default (`root device <name> is gone`); with
+  `kern.disk.root_lost=eio` (a writable sysctl, its boot default set by the kernel command line's
+  `root_lost=panic|eio`), the root stays mounted with every read and write failing `EIO`, and a
+  `lost root` event (`DEVD.md`) goes out. The drive coming back isn't the root again.
+- Each change is logged (`[disk] sata0.2: attached ...`, `detached`) and reported on
+  `/dev/devctl` (`DEVD.md` §3).
+- QEMU emulates no AHCI hot plug: a test-only system call retires a drive as if pulled, then
+  enqueues its port's task, which finds it still there and registers it again; the interrupt
+  path and multipliers are tried on real hardware.
+
 5.4. A CD's block device reports 2048-byte sectors; the block layer (`vfs_bdev`, `vfs_bio`) MUST
 handle a device sector size other than 512.
 

@@ -165,7 +165,11 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
 3. **Visibility** (§8): `/proc/0`, `/proc/0/task`, `ps` `[kernel]` and `-H`; test: `ps -axH`
    lists `[kernel/taskq]`.
 4. **Module exports** (§7); test: a test module's task and thread.
-5. **AHCI hot plug** (§9), tried on real hardware (`INSTALLER.md` §11 step 4).
+5. **AHCI hot plug** (§9; its detail in `INSTALLER.md` §5.3), port multipliers' asynchronous
+   notification and the lost-root policy included; test: a test-only system call pulls a drive in
+   software (forced unmount, `EIO`), and the port's task registers it again. Then tried on real
+   hardware (`INSTALLER.md` §11 step 4). Its events reach userland through `/dev/devctl`
+   (`DEVD.md`), built next.
 
 Progress: step 1 done (2026-10-21): `sys/kern/kern_kthread.rs` (`kthread_add`, `kthread_exit`,
 `kthread_yield`, the 100 ms log), `kern_synch::{tsleep, wakeup, wakeup_one, pause}`
