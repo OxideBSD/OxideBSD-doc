@@ -177,6 +177,11 @@ Step 2 done (2026-10-21): `sys/kern/subr_taskqueue.rs` (`Task`, `enqueue`, `drai
 `kern_syscall_smoke`: coalesced enqueues (`pending` 3), an enqueue from an interrupt handler (IRQ
 13 raised with `int`), a task enqueued again while it runs, `drain` over a sleeping task, a queue of
 one's own.
+Step 3 done (2026-10-21): procfs's `/proc/0` and `/proc/0/task/<tid>` (the kernel's accessors take a
+kernel thread's id with bit 32, `sys/process/procfs.rs`'s `lookup`); kernel threads' `stat` flags
+carry Linux's `PF_KTHREAD`, so `pgrep` passes them over without `-S`; `ps -H`. The system
+taskqueue's thread now starts in `scheduler::start`, so test kernels have it too. Tested in
+`bin_syscall_smoke` (`bin5.sh`).
 
 ## 11. Decisions
 
