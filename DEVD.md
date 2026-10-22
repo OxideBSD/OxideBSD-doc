@@ -164,14 +164,14 @@ evaluated, by devd (§3.2, §5.4): the remaining risk is a handler that uses the
 Each step is one commit, with its test; the suite and the POSIX canary stay green.
 
 1. **`/dev/devctl`** (§3, §4) and the events of §3.3 from the disk registry, devfs and the media
-   check (`lost root` with hot plug's root policy, `KTHREAD.md` step 5); test: a user program
+   check (`lost root` from hot plug's root policy, `KTHREAD.md` step 5); test: a user program
    reads boot's `attach disk` and `create dev` lines from `/dev/devctl`, checks a second open
    fails with `EBUSY`, `poll`, `O_NONBLOCK`'s `EAGAIN`, and the drop count with a tiny queue.
 2. **libsh embedding**: the builtin hook a program linking `lib/libsh` adds its own builtins
    through (`on`); host tests in `lib/libsh`.
 3. **devd** (§5) with `/etc/rc.d/devd`, `/etc/devd.conf`, the pipe and the manual pages; test: a
    test kernel boots with a rule that writes each `attach disk` event to a file, and a client of
-   the pipe sees a hot plug test's events (`KTHREAD.md` step 5's test hook).
+   the pipe sees the events of a software pull (`debug.disk.unplug`).
 
 ## 9. Decisions
 

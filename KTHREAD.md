@@ -166,7 +166,7 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
    lists `[kernel/taskq]`.
 4. **Module exports** (§7); test: a test module's task and thread.
 5. **AHCI hot plug** (§9; its detail in `INSTALLER.md` §5.3), port multipliers' asynchronous
-   notification and the lost-root policy included; test: a test-only system call pulls a drive in
+   notification and the lost-root policy included; test: `debug.disk.unplug` pulls a drive in
    software (forced unmount, `EIO`), and the port's task registers it again. Then tried on real
    hardware (`INSTALLER.md` §11 step 4). Its events reach userland through `/dev/devctl`
    (`DEVD.md`), built next.
@@ -192,11 +192,23 @@ none and returns 0 or `EWOULDBLOCK`, as FreeBSD's. So that a module's `module_in
 threads (§4.5), `oxidebsd::init` installs the global frame allocator before any module loads, and
 `module::load` takes none. Tested by the test-only module `sys/modules/kthread_smoke`, loaded by
 `kern_syscall_smoke`.
+Step 5 done (2026-10-22), except the real-hardware try: AHCI hot plug (`sys/drivers/ahci.rs`'s
+`hotplug` port tasks; `drivers::disk::{retire, hot_attach}`), multipliers' notification,
+`kern.disk.root_lost`, `debug.disk.unplug`. Raw disk devices now take the giant lock, as file
+systems' calls do: a process asleep in a transfer under it holds the driver's lock, which a raw
+read would otherwise spin on, the sleeper never run again. devfs now prunes before it adds, so a
+node made again under its old name with new numbers (a GPT label) isn't lost. Tested in
+`cd9660_syscall_smoke`: a mounted msdosfs on `sata0.0` unmounted by force, open descriptors
+failing, the drive back under its name with its file system intact. Not exercised by a test: the
+interrupt path, multipliers, the root going.
 
 ## 11. Decisions
 
 - 2026-10-20 (user): hot plug's work runs in real kernel threads, not at return to user mode and
   not on an explicit rescan.
+- 2026-10-22 (user): hot plug includes multipliers' asynchronous notification; the root's drive
+  going panics unless `kern.disk.root_lost=eio`; tested through a software pull; events to
+  userland by `/dev/devctl` and devd (`DEVD.md`).
 - 2026-10-21 (user): the task structure lives in its own crate, `lib/libkthread`; the frame
   allocator is installed before modules load, so a module may start threads in `module_init`.
 - 2026-10-21 (user): kernel threads are FreeBSD's: threads of pid 0 (`[kernel]`, `[kernel/<name>]`

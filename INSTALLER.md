@@ -141,19 +141,20 @@ AHCI hot plug in detail (decided 2026-10-22):
   registered; link up and registered, the drive is identified again and, if its model, serial
   number or size differ, the old drive is retired and the new one registered (a reset of the
   driver's own also signals a change: an unchanged drive is left alone).
-- **Retiring a drive**: every file system on its devices is unmounted by force (descriptors on
-  them go to deadfs: `EIO`), its raw `/dev` descriptors fail with `EIO`, its nodes and block
-  devices go. Its registry entry stays: a drive plugged into the same place gets that entry back,
+- **Retiring a drive**: it's marked gone first (so the forced unmounts' writes fail at once,
+  not after a command timeout each), then every file system on its devices is unmounted by force
+  (descriptors on them go to deadfs: reads at end of file, writes failing `EIO`), its raw `/dev`
+  descriptors fail with `EIO`, its nodes and block devices go. Its registry entry stays: a drive plugged into the same place gets that entry back,
   with the same name and device numbers.
 - **The root's drive** going panics by default (`root device <name> is gone`); with
-  `kern.disk.root_lost=eio` (a writable sysctl, its boot default set by the kernel command line's
-  `root_lost=panic|eio`), the root stays mounted with every read and write failing `EIO`, and a
+  `kern.disk.root_lost=eio` (a writable sysctl, and a boot tunable: `kern.disk.root_lost=eio`
+  on the kernel command line), the root stays mounted with every read and write failing `EIO`, and a
   `lost root` event (`DEVD.md`) goes out. The drive coming back isn't the root again.
 - Each change is logged (`[disk] sata0.2: attached ...`, `detached`) and reported on
   `/dev/devctl` (`DEVD.md` §3).
-- QEMU emulates no AHCI hot plug: a test-only system call retires a drive as if pulled, then
-  enqueues its port's task, which finds it still there and registers it again; the interrupt
-  path and multipliers are tried on real hardware.
+- QEMU emulates no AHCI hot plug: writing a drive's name to `debug.disk.unplug` (root, like
+  `debug.kill_init`) has its port's task retire it as if pulled, then find it still there and
+  register it again; the interrupt path and multipliers are tried on real hardware.
 
 5.4. A CD's block device reports 2048-byte sectors; the block layer (`vfs_bdev`, `vfs_bio`) MUST
 handle a device sector size other than 512.
