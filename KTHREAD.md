@@ -182,11 +182,19 @@ kernel thread's id with bit 32, `sys/process/procfs.rs`'s `lookup`); kernel thre
 carry Linux's `PF_KTHREAD`, so `pgrep` passes them over without `-S`; `ps -H`. The system
 taskqueue's thread now starts in `scheduler::start`, so test kernels have it too. Tested in
 `bin_syscall_smoke` (`bin5.sh`).
+Step 4 done (2026-10-21): `lib/libkthread` (crate `kthread_if`: `Task`, the exports' declarations);
+kernel threads' and tasks' functions are `extern "C"`; `oxidebsd_tsleep` takes a timeout of 0 for
+none and returns 0 or `EWOULDBLOCK`, as FreeBSD's. So that a module's `module_init` can start
+threads (§4.5), `oxidebsd::init` installs the global frame allocator before any module loads, and
+`module::load` takes none. Tested by the test-only module `sys/modules/kthread_smoke`, loaded by
+`kern_syscall_smoke`.
 
 ## 11. Decisions
 
 - 2026-10-20 (user): hot plug's work runs in real kernel threads, not at return to user mode and
   not on an explicit rescan.
+- 2026-10-21 (user): the task structure lives in its own crate, `lib/libkthread`; the frame
+  allocator is installed before modules load, so a module may start threads in `module_init`.
 - 2026-10-21 (user): kernel threads are FreeBSD's: threads of pid 0 (`[kernel]`, `[kernel/<name>]`
   under `-H`); `kthread_add` plus `taskqueue(9)`; exported to modules; cooperative, with a log for
   one that runs too long. procfs hides kernel threads' ids and shows `/proc/0`; user threads keep
