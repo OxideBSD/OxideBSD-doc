@@ -483,6 +483,12 @@ separate types) instead of multi-instance oxfs. It gets its own specification (`
 written) after piece B lands. `oxupdate` (§4.7) and piece C's handover from mfsroot to the disk
 root both wait on it.
 
+Done (2026-10-23): with the VFS in place, oxfs became multi-instance as the user then chose. Each
+mount is its own `Fs` (device, layout, free counts, inode table, clean flag, label), which the
+kernel's mount points at (`mnt_data`), as msdosfs's does; the buffer cache was per device already.
+The root is the one whose read-write state oxfs reports to the kernel, and the one that gets
+`/dev`. `install_boot` mounts a second oxfs next to the mfsroot's.
+
 ### 4.9. Verification
 
 - Every existing test passes booting from `test.img`, and the canary matches its baseline.
@@ -567,8 +573,8 @@ the old one is mounted again and init started on it, with the reason on the cons
 call).
 
 5.1.4. oxfs mounts from the device the kernel hands it (`MountArgs::dev`), not the boot root's,
-and unmounts completely, so it can be mounted again from another partition. One oxfs at a time
-still (a second needs per-instance state, §4.8).
+and unmounts completely, so it can be mounted again from another partition. Since 2026-10-23
+any number may be mounted at once (§4.8).
 
 5.1.5. Test: a disk with two oxfs partitions, `rootfs` and `rootfs2` (a copy with a marker); a
 test boots on `rootfs`, reroots to `rootfs2`, checks the marker, `mount`, and that `rootfs` was

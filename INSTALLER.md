@@ -312,8 +312,9 @@ private-use characters, and text leaves as UTF-8.
 Step 8 done (2026-10-22): `lib/libpart` (host tests), `mkimg` on it (the same images, byte for
 byte), the kernel's reader on it, `DIOCRESCAN` and the retaste (§8.1), `gpart` (host tests on
 image files; `install_boot` partitions the blank disk, makes and checks an oxfs, and deletes a
-partition while another is open). The partition editor's screens are step 9's. Open for step 9:
-oxfs mounts one file system at a time (`RAM_FLOOR.md` §4.8), and the mfsroot is one.
+partition while another is open). The partition editor's screens are step 9's. Before step 9
+(2026-10-23, user): oxfs mounts any number of file systems at once (`RAM_FLOOR.md` §4.8), so the
+installer mounts the new root next to the mfsroot; `install_boot` mounts one.
 
 ## 12. Open questions
 
