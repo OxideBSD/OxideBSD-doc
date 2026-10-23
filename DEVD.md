@@ -1,6 +1,6 @@
 # OxideBSD device events: devctl(4) and devd(8), design specification
 
-Status: **accepted** (2026-10-22); being implemented (§8).
+Status: **accepted** (2026-10-22); being implemented (§8): step 1 done.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -47,7 +47,7 @@ MUST ignore verbs, classes and fields it doesn't know):
 
 | Line | When |
 | --- | --- |
-| `attach disk name= bus= model= kind= sectors= sector_size=` (+ the bus's own: AHCI's `controller= port=` and `pmp=` behind a multiplier) | a disk or CD drive is registered: at boot, or plugged in |
+| `attach disk name= bus= model= kind= sectors= sector_size=` (+ the bus's own: AHCI's `controller= port=` and `pmp=` behind a multiplier) | a disk or CD drive is registered: at boot, or plugged in. `bus` is `ahci`, `ata`, `virtio_blk` or `virtio_scsi`; `kind` `disk` or `cd`; `sectors` counts 512-byte sectors (0 for an empty CD drive), `sector_size` is the drive's own |
 | `detach disk name= bus=` | a drive is pulled out (after its file systems are unmounted, §3.5) |
 | `create dev name= major= minor=` | a `/dev` node is made (`make_dev`), `name` relative to `/dev` |
 | `destroy dev name= major= minor=` | a `/dev` node goes |
@@ -56,8 +56,11 @@ MUST ignore verbs, classes and fields it doesn't know):
 | `lost root name= policy=eio` | the root file system's drive went and the system keeps running (`INSTALLER.md` §5.3) |
 | `lost devctl count=` | `count` events were dropped before this one (§4.3) |
 
-On attach the `attach disk` line comes first, then a `create dev` line for the whole disk and one
-for each partition and label; on detach the `destroy dev` lines come first, then `detach disk`.
+On attach the `attach disk` line comes first, then a `create dev` line for the whole disk, then
+(a CD drive with a disc) `media cd state=inserted`, then one `create dev` for each partition and
+label; on detach the `destroy dev` lines come first, then `detach disk`. A disc swapped for another
+is `state=ejected`, then `state=inserted`, each with the partitions' `destroy dev` before it and
+`create dev` after.
 
 3.4. **Events start at boot.** The disks, CDs and `/dev` nodes found at boot are reported like
 any found later (the queue holds them until devd opens `/dev/devctl`, §4.3), so a rule for
@@ -93,19 +96,21 @@ interrupt handler (it allocates). It wakes a blocked reader and any `poll` waiti
 mounted). `/etc/rc.d/devd` starts it after `devfs` and before the local file systems
 (`REQUIRE: devfs`, `BEFORE: mountcritlocal`), so mount rules can see boot's drives. Options:
 `-d` stays in the foreground and logs each event and rule to stderr; `-f <file>` reads that file
-only instead of §5.3's list; `-n` checks the configuration and exits (status 0 if it loaded).
+only instead of §5.3's list; `-n` checks the configuration and exits (status 0 if it loaded);
+`-t <seconds>` sets the handler timeout (§5.4, default 30, 0 for none).
 
 5.2. **The configuration is a shell script**, run by devd's own copy of OxideBSD's shell
 (`lib/libsh`, linked in: no `/bin/sh` process for it). Everything sh has is there (functions,
 variables, `case`, `.`); devd adds one builtin:
 
 ```
-on VERB CLASS HANDLER [NAME=PATTERN ...]
+on VERB CLASS HANDLER [NAME=PATTERN | NAME!=PATTERN ...]
 ```
 
-which adds a rule: an event matches when its verb matches `VERB`, its class `CLASS` and, for each
-`NAME=PATTERN`, its field `NAME` exists and matches `PATTERN` (each a sh glob, `case`'s rules:
-`'*'` matches anything, `sata*` every AHCI name). `HANDLER` is shell text, run as `eval` would:
+which adds a rule: an event matches when its verb matches `VERB`, its class `CLASS`, for each
+`NAME=PATTERN` its field `NAME` exists and matches `PATTERN`, and for each `NAME!=PATTERN` its
+field `NAME` is missing or doesn't match `PATTERN` (each a sh glob, `case`'s rules: `'*'` matches
+anything, `sata*` every AHCI name). `HANDLER` is shell text, run as `eval` would:
 a function's name, or a command line in quotes. Rules match in the order `on` added them; every
 matching rule runs, not only the first.
 
@@ -133,18 +138,32 @@ handler runs see them as environment variables), then each matching rule's handl
 and the child exits. A handler's `exit`, `cd` or variable assignments end with the child, never
 reaching devd or the next event. devd waits for the child before the next event, so events are
 handled in the order they happened (an `attach disk` rule finishes before the `create dev` rules
-for its partitions); a handler wanting to keep going in the background uses `&`. The fields are
+for its partitions); a handler wanting to keep going in the background uses `&`. A child still
+running after the timeout (`-t`, 30 seconds) is killed with its process group (`SIGKILL`), the
+kill logged, and devd goes on to the next event. The fields are
 values, never code: devd parses the line itself (§3.2) and assigns them; it never `eval`s an
 event. A handler that quotes its variables (`"$model"`) is safe from any string a device reports.
 
 5.5. **Following events** (FreeBSD's `devd.pipe`). devd listens on an `AF_UNIX` stream socket,
 `/var/run/devd.pipe`, mode `0666`, and writes every event line it reads to every connected
-client, before running its rules. A client that falls behind (the write would block) is
+client, before running its rules. A client gets the events from its connection on, no backlog
+(what is attached now is in `kern.disks` and `/dev`). A client that falls behind (the write would block) is
 disconnected. Clients can't send anything; what they send is discarded. `cat` over a socket
 (`nc -U /var/run/devd.pipe`) shows the events live.
 
 5.6. devd logs to syslog (`daemon` facility): each handler that exits non-zero, with the event;
 configuration errors; the reload. It runs as root.
+
+5.7. **The stock `/etc/devd.conf`** logs (`logger -t devd`) each disk attached or detached and a
+lost root, and mounts a CD's disc when one is found (`media cd state=inserted`, at boot or later):
+read-only, `cd9660`, on the lowest-numbered `/cdrom/disk<N>` (from 0) that isn't a mount point
+already, made if missing. A disc can't leave a mounted drive (its tray is locked, `INSTALLER.md`
+§5.3), so unmounting is the user's (`umount /cdrom/disk0`). Other rules are commented examples.
+
+5.8. **The kernel looks for discs** (FreeBSD's `kern.cam.cd.poll_period`): every
+`kern.disk.cd_poll` seconds (default 3, 0 for never) a kernel task asks each CD drive with nothing
+mounted on it whether its disc changed (`drivers::disk::media_check`), so a disc put in or taken
+out makes its `media cd` event without anything opening the drive.
 
 ## 6. Manual pages
 
@@ -167,9 +186,13 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
    check (`lost root` from hot plug's root policy, `KTHREAD.md` step 5); test: a user program
    reads boot's `attach disk` and `create dev` lines from `/dev/devctl`, checks a second open
    fails with `EBUSY`, `poll`, `O_NONBLOCK`'s `EAGAIN`, and the drop count with a tiny queue.
+   **Done** (2026-10-22): `sys/kern/subr_devctl.rs`, `/dev/devctl` (7, 1); `kern-smoke devctl`
+   (`regress/kern-smoke/devctl.c`) checks the device's rules with pts nodes as the events, and
+   `cd9660-syscall-smoke` the disk, media and node events of boot and of a software pull.
 2. **libsh embedding**: the builtin hook a program linking `lib/libsh` adds its own builtins
    through (`on`); host tests in `lib/libsh`.
-3. **devd** (§5) with `/etc/rc.d/devd`, `/etc/devd.conf`, the pipe and the manual pages; test: a
+3. **devd** (§5) with `/etc/rc.d/devd`, `/etc/devd.conf`, the pipe, the kernel's disc polling
+   (§5.8) and the manual pages; test: a
    test kernel boots with a rule that writes each `attach disk` event to a file, and a client of
    the pipe sees the events of a software pull (`debug.disk.unplug`).
 
@@ -180,8 +203,13 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
   devd through `lib/libsh`, rules added by an `on` builtin; read from `/etc/devd.conf`,
   `/etc/devd/*.conf`, `/usr/local/etc/devd/*.conf`; the client pipe now; events for disk
   attach/detach, devfs nodes, CD media and a lost root.
+- 2026-10-22 (user): events for dynamic network interfaces wait for those interfaces (no
+  `ifconfig` yet); devd comes first.
+- 2026-10-22 (user): the stock configuration logs and mounts CDs, on `/cdrom/disk<N>`; the kernel
+  polls idle CD drives for that; a handler is killed after a timeout; `on` takes `NAME!=PATTERN`;
+  pipe clients get no backlog.
 
 ## 10. Open questions
 
 - Other buses' events (USB devices, network interfaces' link state, ACPI) come with their
-  drivers; `ifconfig`-driven events wait for dynamic interfaces.
+  drivers; `ifconfig`-driven events wait for dynamic interfaces (delayed, §9).

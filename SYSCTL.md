@@ -130,6 +130,9 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `debug.syscall.stats` | string | read | calls, wall and CPU time per system call since boot or the last reset |
 | `debug.syscall.reset` | int | read-write | writing a non-zero value zeroes `debug.syscall.stats`; reads 0 |
 | `kern.tty.pty_max` | int | read-write, tunable | most pseudo-terminals at once (`PTY.md` §2.4), default 256 |
+| `kern.devctl.queue` | int | read-write, tunable | device events `/dev/devctl` holds (`DEVD.md` §4.3), default 256, 16 to 65536 |
+| `kern.devctl.dropped` | unsigned long | read | device events dropped since boot because the queue was full |
+| `kern.disk.root_lost` | string | read-write, tunable | what the root's drive going does (`INSTALLER.md` §5.3): `panic` (the default) or `eio` |
 | `kern.ipc.msqids` | `S,msqid_ds` | read | the System V message queues: a record per queue, `{int id; int pad; struct msqid_ds}`, as `IPC_STAT` fills it; the mode also carries `MSG_RWAIT` (`0o2000`) and `MSG_WAIT` (`0o4000`) while a receiver or sender waits (§5.2) |
 | `kern.ipc.shmsegs` | `S,shmid_ds` | read | the shared memory segments, `{int id; int pad; struct shmid_ds}`; `SHM_DEST` (`0o1000`) in the mode of a segment removed while attached (§5.2) |
 | `kern.ipc.sema` | `S,semid_ds` | read | the semaphore sets, `{int id; int pad; struct semid_ds}` (§5.2) |
@@ -137,6 +140,7 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `kern.ipc.shmmax`, `shmmin`, `shmmni` | unsigned long | read | the largest and smallest segment in bytes, the most segments |
 | `kern.ipc.semmni`, `semmsl`, `semopm`, `semvmx` | unsigned long | read | the most sets, semaphores per set, operations per `semop`, a semaphore's largest value |
 | `security.bsd.see_other_uids` | int | read-write | 1 (the default): every user sees every process and IPC object. 0: an unprivileged caller sees only processes whose real user ID is its own (`/proc`, so `ps`) and IPC objects it owns or created (FreeBSD's) |
+| `debug.disk.unplug` | string | write | pulls the AHCI drive named out in software, as if unplugged (`INSTALLER.md` §5.3) |
 | `debug.kill_init` | int | read-write | writing a signal number kills init with it, so that its restart (`INIT.md` §9) can be tested; reads 0 |
 
 5.1. **Architecture names** are FreeBSD's, `hw.machine` naming the port and `hw.machine_arch`

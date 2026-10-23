@@ -48,7 +48,7 @@ other driver.
 
 3.5. Device numbers are kept as they are (Linux's where one exists): `null` (1, 3), `zero`
 (1, 5), `random` (1, 8), `urandom` (1, 9), `ttyv<n>` (4, n), `tty` (5, 0), `console` (5, 1),
-`klog` (7, 0), `fb0` (29, 0); the disks (`INSTALLER.md` §5), one major per driver and minor
+`klog` (7, 0), `devctl` (7, 1), `fb0` (29, 0); the disks (`INSTALLER.md` §5), one major per driver and minor
 `unit << 8` for a whole disk, `unit << 8 | N` for its partition N: `ide<u>` (3, u << 8) and
 `ide<u>p<N>`/`ide<u>s<N>` (3, u << 8 | N), `scsi<u>` (8, u << 8), `virt<u>` (252, u << 8) and
 their partitions likewise, `sata<C>.<P>[.<M>]` (251, u << 8) with u its place, `C << 9 | P << 4 |
