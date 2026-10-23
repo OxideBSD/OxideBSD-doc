@@ -133,6 +133,7 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `kern.devctl.queue` | int | read-write, tunable | device events `/dev/devctl` holds (`DEVD.md` §4.3), default 256, 16 to 65536 |
 | `kern.devctl.dropped` | unsigned long | read | device events dropped since boot because the queue was full |
 | `kern.disk.root_lost` | string | read-write, tunable | what the root's drive going does (`INSTALLER.md` §5.3): `panic` (the default) or `eio` |
+| `kern.disk.cd_poll` | int | read-write, tunable | seconds between `cdpoll`'s looks for a changed disc in each CD drive with nothing mounted (`DEVD.md` §5.8): 3 by default, 0 for only at open, at most 86400 |
 | `kern.ipc.msqids` | `S,msqid_ds` | read | the System V message queues: a record per queue, `{int id; int pad; struct msqid_ds}`, as `IPC_STAT` fills it; the mode also carries `MSG_RWAIT` (`0o2000`) and `MSG_WAIT` (`0o4000`) while a receiver or sender waits (§5.2) |
 | `kern.ipc.shmsegs` | `S,shmid_ds` | read | the shared memory segments, `{int id; int pad; struct shmid_ds}`; `SHM_DEST` (`0o1000`) in the mode of a segment removed while attached (§5.2) |
 | `kern.ipc.sema` | `S,semid_ds` | read | the semaphore sets, `{int id; int pad; struct semid_ds}` (§5.2) |

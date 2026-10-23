@@ -28,7 +28,7 @@ programs; `grep`, `sed`, `ed` and `expr` share `lib/libregex`, `gzip` and `tar` 
 
 | Source | Programs |
 |--------|----------|
-| Native (`sbin/`, 24) | `adjkerntz`, `dhclient`, `dmesg`, `emergency`, `fsck`, `fsck_msdosfs`, `fsck_oxfs`, `ifconfig`, `init`, `init_sh`, `lsoxmod`, `mknod`, `mount`, `newfs_msdos`, `newfs_oxfs`, `nologin`, `ping` (set-user-ID root, mode 4555), `rcorder`, `reboot`, `route`, `shutdown`, `sysctl`, `umount`, `update` |
+| Native (`sbin/`, 25) | `adjkerntz`, `devd`, `dhclient`, `dmesg`, `emergency`, `fsck`, `fsck_msdosfs`, `fsck_oxfs`, `ifconfig`, `init`, `init_sh`, `lsoxmod`, `mknod`, `mount`, `newfs_msdos`, `newfs_oxfs`, `nologin`, `ping` (set-user-ID root, mode 4555), `rcorder`, `reboot`, `route`, `shutdown`, `sysctl`, `umount`, `update` |
 | Third-party (1) | `zstd` (`external/bsd/zstd`, static, so a set archive unpacks before `/usr` exists; `RAM_FLOOR.md` §4.3.4) |
 | Links (8) | `halt` = `reboot`, `poweroff` = `reboot`, `mount_nullfs` = `mount`, `mount_tmpfs` = `mount`, `mount_msdosfs` = `mount`, `lsmod` -> `lsoxmod`, `unzstd` = `zstd`, `zstdcat` = `zstd` |
 

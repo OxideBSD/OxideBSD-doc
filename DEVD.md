@@ -1,6 +1,6 @@
 # OxideBSD device events: devctl(4) and devd(8), design specification
 
-Status: **accepted** (2026-10-22); being implemented (§8): steps 1 and 2 done.
+Status: **accepted** (2026-10-22); implemented (§8, steps 1-3 done 2026-10-22).
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -93,8 +93,10 @@ interrupt handler (it allocates). It wakes a blocked reader and any `poll` waiti
 ## 5. devd(8)
 
 5.1. **devd is `/sbin/devd`**, a static Rust std program (`hier(7)`: it runs before `/usr` is
-mounted). `/etc/rc.d/devd` starts it after `devfs` and before the local file systems
-(`REQUIRE: devfs`, `BEFORE: mountcritlocal`), so mount rules can see boot's drives. Options:
+mounted). `/etc/rc.d/devd` starts it once the file systems are mounted and syslogd is up
+(`REQUIRE: FILESYSTEMS syslogd`, `BEFORE: SERVERS`): `rc.d/cleanvar` empties `/var/run`, where
+its socket and pid file live, after `mountcritlocal`, and its handlers log. Its rules still see
+boot's drives, from the queue (§3.4). Options:
 `-d` stays in the foreground and logs each event and rule to stderr; `-f <file>` reads that file
 only instead of §5.3's list; `-n` checks the configuration and exits (status 0 if it loaded);
 `-t <seconds>` sets the handler timeout (§5.4, default 30, 0 for none).
@@ -161,7 +163,7 @@ already, made if missing. A disc can't leave a mounted drive (its tray is locked
 §5.3), so unmounting is the user's (`umount /cdrom/disk0`). Other rules are commented examples.
 
 5.8. **The kernel looks for discs** (FreeBSD's `kern.cam.cd.poll_period`): every
-`kern.disk.cd_poll` seconds (default 3, 0 for never) a kernel task asks each CD drive with nothing
+`kern.disk.cd_poll` seconds (default 3, 0 for never) a kernel thread, `cdpoll`, asks each CD drive with nothing
 mounted on it whether its disc changed (`drivers::disk::media_check`), so a disc put in or taken
 out makes its `media cd` event without anything opening the drive.
 
@@ -197,6 +199,10 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
    (§5.8) and the manual pages; test: a
    test kernel boots with a rule that writes each `attach disk` event to a file, and a client of
    the pipe sees the events of a software pull (`debug.disk.unplug`).
+   **Done** (2026-10-22): `sbin/devd` (host tests of event parsing and rules), `etc/devd.conf`,
+   `etc/rc.d/devd`, `kern.disk.cd_poll` and the `cdpoll` kernel thread, devctl(4), devd(8),
+   devd.conf(5); `cd9660-syscall-smoke` runs devd through pty events and sata0.0's pull with a
+   `devd.pipe` client, the reload, the exit and the timeout kill.
 
 ## 9. Decisions
 
@@ -210,6 +216,9 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
 - 2026-10-22 (user): the stock configuration logs and mounts CDs, on `/cdrom/disk<N>`; the kernel
   polls idle CD drives for that; a handler is killed after a timeout; `on` takes `NAME!=PATTERN`;
   pipe clients get no backlog.
+- 2026-10-22: devd starts after `FILESYSTEMS` and `syslogd`, not before `mountcritlocal` (§5.1):
+  `cleanvar` empties `/var/run` after `mountcritlocal`. **Rationale.** Its socket and pid file live
+  there, and its handlers log; boot's events wait in the queue, so nothing is missed.
 
 ## 10. Open questions
 
