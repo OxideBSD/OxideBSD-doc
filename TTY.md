@@ -84,10 +84,14 @@ combinations.
 input unless `NOFLSH`. The characters come from `c_cc`, not fixed values.
 
 3.7. **Output processing** (`c_oflag`): `OPOST`, `ONLCR`, `OCRNL`, `ONOCR`, `ONLRET`, `OXTABS`
-(tab expansion). Output is bytes: the UTF-8 check on console writes is removed.
+(tab expansion). Output is bytes: the UTF-8 check on console writes is removed. The console
+decodes UTF-8 and draws each character its font (code page 437) has, `■` for the rest; after
+`SGR 11` it draws bytes as glyphs until `SGR 10` (INSTALLER.md §7.3). `IUTF8` (Linux's and
+FreeBSD's): erasing (`VERASE`, `VWERASE`, `VKILL`) takes a whole UTF-8 character, and only its
+first byte takes a column.
 
 3.8. The default `termios` MUST be 4.4BSD's `TTYDEF_*` values (`<sys/ttydefaults.h>`), which all
-three BSDs share: `ICRNL|IXON|IXANY|IMAXBEL|BRKINT`,
+three BSDs share: `ICRNL|IXON|IXANY|IMAXBEL|BRKINT` (and `IUTF8`, as FreeBSD's),
 `OPOST|ONLCR`, `CREAD|CS8|HUPCL`, `ICANON|ISIG|IEXTEN|ECHO|ECHOE|ECHOKE|ECHOCTL`, the standard
 control characters, 9600 baud for serial lines.
 

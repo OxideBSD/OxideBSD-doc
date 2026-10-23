@@ -184,14 +184,29 @@ drive's bus name, §5.1).
 UK, German, French AZERTY, Dvorak, Colemak, JIS), for PS/2 and the USB HID keyboard alike.
 
 7.2. Set at run time by `wsconsctl keyboard.encoding=<name>` (NetBSD's and OpenBSD's tool and
-names: `us`, `uk`, `de`, `fr`, `us.dvorak`, `us.colemak`, `jp`), over a new console ioctl, and at
-boot from `/etc/wsconsctl.conf` by `rc.d/wsconsctl` (decided §12).
+names: `us`, `uk`, `de`, `fr`, `us.dvorak`, `us.colemak`, `jp`, and `no`, `fi`, `sv`, which
+`pc-keyboard` also has), over the console terminal's `KBDIOC_GETENCODING`/`KBDIOC_SETENCODING`
+(`ttyv0` only, setting root's; OxideBSD's numbers), and at boot from `/etc/wsconsctl.conf` by
+`rc.d/wsconsctl` (decided §12).
+
+7.3. A layout's keys reach the terminal as UTF-8, and the console shows each character its font
+(code page 437) has; `IUTF8` (on by default) makes erasing take a whole character (`TTY.md`
+§3.7). `SGR 11`/`SGR 10` (the `linux` terminfo's `smacs`/`rmacs`) switch the console to drawing
+bytes as the font's glyphs and back, for curses' line drawing.
 
 ## 8. Partitioning
 
-8.1. A library, `lib/libpart` (shared with `mkimg`), reads and writes GPT (primary and backup
-header and table, CRCs) and MBR (primary partitions), and the kernel re-reads a disk's
-partitions after a change (a `DIOCGPARTRESCAN`-style ioctl on the disk's node).
+8.1. A library, `lib/libpart` (shared with `mkimg`, `gpart` and the kernel's reader), reads and
+writes GPT (primary and backup header and table, CRCs; a damaged primary read from the backup)
+and MBR (primary partitions), keeping what it doesn't interpret (boot code, GUIDs, attributes,
+other systems' types). The kernel re-reads a disk's partitions after a change: on `DIOCRESCAN`
+(`_IO('d', 130)`, on the whole disk's node open for writing), and when the whole disk's last
+writer closes it (FreeBSD's GEOM retaste), both only if the table changed; with a partition
+mounted or open the reread waits until the last one is let go (decided §13).
+
+8.1.1. `gpart(8)` (FreeBSD's verbs and output: show, create, destroy, add, delete, resize,
+modify, set/unset active) edits tables by hand, also on image files, and is in the mfsroot's
+`rescue`.
 
 8.2. The editor (in the installer, §9) MUST: show every disk and its partitions and free space;
 create, delete and resize partitions (a resize only into adjacent free space, and an oxfs
@@ -289,6 +304,16 @@ Step 6 done (2026-10-22, before step 5 by the user's choice, §13): the mfsroot 
 loaded image, compressed or not; `/rescue/rescue`), `install.iso` (`scripts/mkinstalliso.sh`), and
 the installer's first screen; tests `install_boot` and `install_boot_bios` boot it at 64 MB and
 check the mfsroot from its shell. Hot plug for step 4 landed with `KTHREAD.md` step 5.
+Step 7 done (2026-10-22): the layouts of §7.2 for PS/2 and USB, `wsconsctl`, `rc.d/wsconsctl`,
+UTF-8 keys and output on the console (§7.3); tested in `install_boot` (QEMU's `sendkey` through
+a new runner hook, `QEMU_MONITOR_INPUT`: German `z`, `y`, `[` give `yzü`). Found on the way:
+libsh wrote characters U+0080..U+00FF as single bytes (`ü` as `0xFC`); raw bytes now live as
+private-use characters, and text leaves as UTF-8.
+Step 8 done (2026-10-22): `lib/libpart` (host tests), `mkimg` on it (the same images, byte for
+byte), the kernel's reader on it, `DIOCRESCAN` and the retaste (§8.1), `gpart` (host tests on
+image files; `install_boot` partitions the blank disk, makes and checks an oxfs, and deletes a
+partition while another is open). The partition editor's screens are step 9's. Open for step 9:
+oxfs mounts one file system at a time (`RAM_FLOOR.md` §4.8), and the mfsroot is one.
 
 ## 12. Open questions
 
@@ -296,6 +321,9 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-22 (user): the kernel rereads a changed table both on an ioctl and on a writer's last
+  close; step 8 also builds `/sbin/gpart` over libpart.
 
 - 2026-10-22 (user): step 6 (the mfsroot and the medium) and the installer before step 5 (USB
   mass storage), all testable from a CD in QEMU. USB waits for MSI, built first, and then
