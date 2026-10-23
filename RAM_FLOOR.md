@@ -12,8 +12,10 @@ more than 64 MB of RAM to boot and to run a console install, under UEFI as under
 need more only if the firmware (OVMF) itself does. Effort below 64 MB isn't spent. Where 128 MB
 appears below it is history. Measured 2026-10-14 (OxideBSD `2183878` onward): BIOS boots clean
 to login at 24 MB (demand-paged file mappings, `DEMANDPAGE.md`); UEFI at 64 MB once (1) our Limine
-fork leaves the firmware 8 MiB, not upstream's hardcoded 64 MiB (`LIMINE_FIRMWARE_RESERVE_MIB`, a
-build-time define: the reservation is made before `limine.conf` is read), and (2) the kernel
+fork leaves the firmware a sixteenth of the usable memory below 4 GiB, between 4 MiB
+(`LIMINE_FIRMWARE_RESERVE_MIB`, a build-time define: the reservation is made before `limine.conf`
+is read) and upstream's 64 MiB; it was a fixed 8 MiB until 2026-10-22, when the install medium's
+mfsroot didn't fit beside the kernel, and (2) the kernel
 reclaims bootloader-reclaimable memory before starting pid 1 (`memory::reclaim_bootloader_memory`:
 42 MB at 64 MB under UEFI), keeping Limine's page tables and the boot stack. OVMF itself was never
 the limit. `tests/ram_floor_boot.rs` boots at 64 MB.

@@ -47,7 +47,7 @@ to a USB stick, on BIOS and UEFI (Limine's hybrid ISO, as the dev ISO already is
 /boot/mfsroot                the mfsroot image (§4)
 /boot/limine/...             Limine and limine.conf
 /EFI/BOOT/BOOTX64.EFI        UEFI boot
-/OxideBSD/<version>/base.tzst, clang.tzst, tests.tzst, MANIFEST
+/OxideBSD/<version>/base.tar.zst, clang.tar.zst, tests.tar.zst, MANIFEST
 ```
 
 `MANIFEST` lists each set's size and SHA-256 (FreeBSD's format), checked before extraction.
@@ -62,13 +62,18 @@ they carry no mfsroot.
 `md` as its contents, and with `mfsroot` on the command line mount `md0` as the root file system
 (read-write: changes live only in memory) in place of a disk's.
 
-4.2. Contents (decided 2026-10-17): `/sbin/init` and `/etc/rc` adapted to start the installer on
-the console (`/etc/rc` runs `/usr/libexec/installer` instead of getty when it finds
-`/etc/installer`); `/bin` and `/sbin` (static); `newfs_oxfs`, `newfs_msdos`, `fsck_*`, `mount`,
+4.2. Contents (decided 2026-10-17): `/sbin/init`, a short `/etc/rc` of its own, and an
+`/etc/ttys` that runs `/usr/libexec/installer -t` on the console in getty's place (FreeBSD's
+install media do the same), so init starts it again whenever it exits; `/bin` and `/sbin` (static); `newfs_oxfs`, `newfs_msdos`, `fsck_*`, `mount`,
 `ifconfig`, `dhclient`, `route`, `zstd`, `tar`; `vi`; `/usr/libexec/installer`; `ncurses`'
 terminfo for the console. No compilers, no BusyBox `/usr`, no `doom`.
 
-4.3. Size: a few MiB. The whole install MUST work at 64 MB of RAM (the RAM rule covers console
+4.3. Size: a few MiB. The tools are crunched into one program, `/rescue/rescue` (`rescue/`,
+FreeBSD's `crunchgen`): each tool's own source included as a module, picked by `argv[0]`, one copy
+of `std` and libc for all (one static Rust program each made 25.8 MB; crunched, 8.5 MB with `vi`,
+`zstd` and the installer beside it). The image is then compressed in 64 KiB chunks, each a zstd
+frame (FreeBSD's `geom_uzip`; format in `sys/drivers/md.rs`), and `md` decompresses a chunk as
+it's read, with `ruzstd`: 2.8 MB in RAM. The whole install MUST work at 64 MB of RAM (the RAM rule covers console
 install): the mfsroot, the installer, and a set extracted as a stream from the medium, never held
 whole in memory.
 
@@ -230,8 +235,13 @@ with the in-tree ncurses through FFI (decided §13), on the console.
 
 ## 10. Build
 
-`build_install.rs` gains: the mfsroot set and image (`makefs -t oxfs`), and `install.iso`
-(`xorriso`, Limine's hybrid boot) from the kernel, the mfsroot and the sets.
+`build_install.rs` makes, at every build: `target/images/mfsroot.img` (`makefs -t oxfs`) from the
+paths `distrib/mfsroot/list` takes from the installed tree, `distrib/mfsroot/etc/` and the
+installer; and `target/sets/MANIFEST`. `build.rs` runs before the kernel is linked, so the image
+itself is the QEMU runner's: `scripts/mkinstalliso.sh` (`xorriso`, Limine's hybrid boot) makes
+`target/images/install.iso` from the kernel, the mfsroot and the sets at every `cargo run`, and
+`OXIDEBSD_BOOT_INSTALLER=1` boots it, with a blank disk (`target/install_target.img`) to install
+on. `OXIDEBSD_NO_INSTALLER=1` makes none of it, in either place.
 
 ## 11. Steps and verification
 
@@ -275,6 +285,10 @@ may be one (`OXIDEBSD_QEMU_DISK=sata`). Tested in `cd9660_syscall_smoke` (two co
 with a file system, a 130 GiB disk, a disc and an empty drive). Not exercised by a test: port
 multipliers (QEMU has none), the handoff and 32-bit DMA (QEMU's controller needs neither), 28-bit
 disks, sectors other than 512 bytes (QEMU's ATA disks have only those).
+Step 6 done (2026-10-22, before step 5 by the user's choice, §13): the mfsroot (`md` over the
+loaded image, compressed or not; `/rescue/rescue`), `install.iso` (`scripts/mkinstalliso.sh`), and
+the installer's first screen; tests `install_boot` and `install_boot_bios` boot it at 64 MB and
+check the mfsroot from its shell. Hot plug for step 4 landed with `KTHREAD.md` step 5.
 
 ## 12. Open questions
 
@@ -282,6 +296,16 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-22 (user): step 6 (the mfsroot and the medium) and the installer before step 5 (USB
+  mass storage), all testable from a CD in QEMU. USB waits for MSI, built first, and then
+  covers Bulk-Only Transport, hubs, hot plug with devd events, and UAS. The install medium is
+  made at every build, and `OXIDEBSD_NO_INSTALLER` stops it. The mfsroot's memory disk reads the
+  loaded image in place, a block copied to a frame of its own at its first write.
+- 2026-10-22: the installer replaces getty in the mfsroot's `/etc/ttys` (§4.2), not a check in
+  `/etc/rc`. **Rationale.** init already restarts a session when it ends, and FreeBSD's media
+  work so. The mfsroot holds a chosen list of programs, not every static one: all of `/bin` and
+  `/sbin` is about 30 MiB, which a 64 MB machine can't keep in RAM.
 
 - 2026-10-17 (user): the mfsroot holds an install and recovery set, no compilers.
 - 2026-10-18 (user): the sets are read from the medium through a new cd9660 module (not loaded
