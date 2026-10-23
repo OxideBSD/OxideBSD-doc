@@ -1,6 +1,6 @@
 # OxideBSD device events: devctl(4) and devd(8), design specification
 
-Status: **accepted** (2026-10-22); being implemented (§8): step 1 done.
+Status: **accepted** (2026-10-22); being implemented (§8): steps 1 and 2 done.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as described in
 RFC 2119.
@@ -191,6 +191,8 @@ Each step is one commit, with its test; the suite and the POSIX canary stay gree
    `cd9660-syscall-smoke` the disk, media and node events of boot and of a software pull.
 2. **libsh embedding**: the builtin hook a program linking `lib/libsh` adds its own builtins
    through (`on`); host tests in `lib/libsh`.
+   **Done** (2026-10-22): `Shell::add_builtin` (a regular built-in, a closure) and `Shell::source`
+   (text run as `.` runs a file, a syntax error returned with its line); `lib/libsh/tests/embed.rs`.
 3. **devd** (§5) with `/etc/rc.d/devd`, `/etc/devd.conf`, the pipe, the kernel's disc polling
    (§5.8) and the manual pages; test: a
    test kernel boots with a rule that writes each `attach disk` event to a file, and a client of
