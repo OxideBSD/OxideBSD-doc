@@ -245,8 +245,39 @@ with the in-tree ncurses through FFI (decided §13), on the console.
 
 9.3. Everything is written only after a final confirmation listing what will be erased.
 
-9.4. Scriptable: `installer -f <file>` reads every answer from a file (FreeBSD's
-`installerconfig`), so the tests can install unattended.
+9.4. Scriptable: `installer -f <file>` reads every answer from a file in FreeBSD's
+`installerconfig` format (decided §13), so the tests can install unattended. The file is a
+preamble of shell variables, read by running it with `/bin/sh` as bsdinstall does, then
+optionally a line `#!/bin/sh` and a script run in the new system (`chroot`) after the install:
+
+```
+PARTITIONS="ide0 GPT { 512K bios, 260M efi, auto oxfs / }"   # or DEFAULT: the guided layout
+DISTRIBUTIONS="base.tar.zst clang.tar.zst"                     # base is always taken
+HOSTNAME=oxide KEYMAP=de ROOTPASS=secret                       # OxideBSD's additions
+#!/bin/sh
+pw useradd alice -m -G wheel
+```
+
+`PARTITIONS` is FreeBSD's syntax: a disk, a scheme, and `{ size type [mountpoint], ... }` with
+sizes in `K`/`M`/`G` or `auto` (the rest); types `oxfs`, `efi`, `bios`, `swap`. `DEFAULT` (or no
+`PARTITIONS`) is the guided layout (§9.5) on the first disk.
+
+9.5. **Guided layout** beside the editor (decided §13): on a whole disk, or in its largest free
+space, so installing next to another system is one choice. A blank disk gets GPT with a BIOS
+boot partition (512 KiB), an ESP (260 MiB, FreeBSD's size), and one oxfs `/` over the rest; a
+disk with other systems keeps them, reuses an existing ESP (OxideBSD's files in their own
+directories, §8.4), and makes only what's missing, in the free space chosen.
+
+9.6. **Dual boot made easy** (decided §13): on UEFI, the installer adds an `OxideBSD` boot entry
+to the firmware's NVRAM (`efibootmgr(8)`, over UEFI runtime services the kernel calls,
+`EFIRT.md`, not yet written) pointing at `\EFI\OxideBSD\BOOTX64.EFI`, and never touches another
+system's files. OxideBSD's Limine menu lists the other systems it finds: every ESP is scanned for
+known loaders (Windows' `bootmgfw.efi`, GRUB, systemd-boot, another Limine), each added as a
+chainload entry; on BIOS, a chainload of each other system's active partition. The confirm screen
+(§9.3) lists the entries; none is ever removed.
+
+9.7. **Looks**: bsdinstall's and sysinst's boxed dialogs (a title, buttons such as `[ OK ]` and
+`[ Back ]`), in rust colours instead of blue (decided §13).
 
 ## 10. Build
 
@@ -274,9 +305,14 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
    installer's first screen headlessly (serial).
 7. **Keymaps** (§7); test: a German layout's `z`/`y` swap through `sendkey`.
 8. **libpart** and the partition editor's backend (§8); host tests against `mkimg`'s images.
-9. **The installer** (§9); test: `installer -f` installs onto a blank disk at 64 MB, and the
-   installed disk boots to a login prompt on BIOS and on UEFI; a second test installs beside an
-   existing partition and checks it untouched.
+9. **The installer** (§9), in three commits (decided §13):
+   - 9a, the engine: `installer -f` (§9.4) partitions, makes the file systems, extracts the sets
+     from the medium, writes the boot loader, `fstab`, `fsconf`, `rc.conf` and root's password;
+     test: an install onto a blank disk at 64 MB, then the installed disk boots to a login prompt
+     on BIOS and on UEFI.
+   - 9b, the screens (§9.2, §9.5, §9.7) over the engine, the partition editor among them.
+   - 9c, dual boot (§9.6): UEFI runtime services and `efibootmgr`, the loader scan; test: an
+     install beside an existing partition and ESP, which are checked untouched.
 
 Progress: step 1 done (2026-10-18): the registry, `kern.disks`/`kern.disk.<name>`, IDE on all
 four positions with per-channel DMA and LBA48, every virtio-blk unit; its test is part of
@@ -322,6 +358,12 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-23 (user): step 9 lands engine first (9a `installer -f`, 9b screens, 9c dual boot).
+  The answer file is FreeBSD's `installerconfig`. A guided layout beside the editor, built to
+  make dual booting painless (§9.5, §9.6). The screens are bsdinstall-style dialogs in rust
+  colours. On UEFI, a real NVRAM boot entry through UEFI runtime services and `efibootmgr`, and
+  Limine's menu chainloads the other systems it detects.
 
 - 2026-10-22 (user): the kernel rereads a changed table both on an ioctl and on a writer's last
   close; step 8 also builds `/sbin/gpart` over libpart.
