@@ -310,9 +310,10 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
      from the medium, writes the boot loader, `fstab`, `fsconf`, `rc.conf` and root's password;
      test: an install onto a blank disk at 64 MB, then the installed disk boots to a login prompt
      on BIOS and on UEFI.
+   - 9c, dual boot (§9.6), before 9b (decided §13): UEFI runtime services and `efibootmgr`
+     (`EFIRT.md`), the loader scan; test: an install beside an existing partition and ESP, which
+     are checked untouched.
    - 9b, the screens (§9.2, §9.5, §9.7) over the engine, the partition editor among them.
-   - 9c, dual boot (§9.6): UEFI runtime services and `efibootmgr`, the loader scan; test: an
-     install beside an existing partition and ESP, which are checked untouched.
 
 Progress: step 1 done (2026-10-18): the registry, `kern.disks`/`kern.disk.<name>`, IDE on all
 four positions with per-channel DMA and LBA48, every virtio-blk unit; its test is part of
@@ -365,6 +366,14 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-23 (user): the screens use the "true rust" palette (cream dialogs, copper titles,
+  burnt-orange selection on iron oxide), set through Linux's `ESC ] P` palette escape, which the
+  console now draws; OxideBSD's own 16-colour `rust` palette is an option for the whole console
+  (`wsconsctl display.palette=rust`), off by default. Users are optional, with a warning if none
+  is made, so a machine can be installed for an OEM-style setup on its first boot (a later
+  program, not yet designed). 9c's NVRAM boot entry (`EFIRT.md`) comes before 9b's screens, so
+  installing beside another system works fully when the screens land.
 
 - 2026-10-23 (user): step 9 lands engine first (9a `installer -f`, 9b screens, 9c dual boot).
   The answer file is FreeBSD's `installerconfig`. A guided layout beside the editor, built to
