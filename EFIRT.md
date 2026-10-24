@@ -146,6 +146,14 @@ Each step its own commit, the suite and the POSIX canary green.
 3. `lib/libefivar` and `efibootmgr(8)`.
 4. The installer's use of it (`INSTALLER.md` step 9c).
 
+Progress: step 1 done (2026-10-23): `sys/efirt.rs`; the boot snapshot keeps the system table and
+memory map; the EFI page table maps the runtime regions with the memory attributes table's
+attributes (OVMF: 838 pages, none writable and executable); `efirt_call` (Microsoft x64, a
+recovery point) and `fixup_fault`, which the page fault and exception handlers ask first;
+`GetTime` logged at boot; `ResetSystem` after the keyboard controller's reset and ACPI's S5.
+`efirt_smoke` checks the clock and a caught fault. The reset fallback is untested: ACPI works
+under QEMU, so it never runs there.
+
 ## 11. Decisions
 
 - 2026-10-23 (user): the firmware runs in a one-to-one page table of its own, with no
