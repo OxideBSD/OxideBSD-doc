@@ -264,7 +264,10 @@ with the in-tree ncurses through FFI (decided §13), on the console.
 5. Time zone (`zone1970.tab`'s regions and zones, on the medium; the new system's `tzsetup`
    makes the link) and whether the hardware clock keeps UTC or local time
    (`/etc/wall_cmos_clock`, `TIMEZONE.md` §4.3), local suggested when Windows is found.
-6. Root's password; users (name, full name, password, `wheel` or not) through `pw`.
+6. Root's password; users (name, full name, password, `wheel` or not) through `pw`. The base
+   set's development account `user` is removed from every installed system. The console is
+   `insecure` (root logs in only through `su`/`sudo`), unless no user is made: then the new
+   `ttys` marks the `ttyv` terminals `secure`, so root can log in (decided §13).
 7. Boot loader (§8.4), `fstab`, `rc.conf`; reboot, shell or back.
 
 9.3. Everything is written only after a final confirmation listing what will be erased: every
@@ -415,6 +418,10 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-24 (user): an install that makes no users marks the console `secure` in the new
+  system, so root can log in there; with users it stays `insecure`. The base set's `user`
+  account never reaches an installed system.
 
 - 2026-10-24 (user), step 9b2: the editor's changes are staged and written after the last
   screen; an existing oxfs may grow (a `growfs` for oxfs, written now); an install may span
