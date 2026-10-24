@@ -210,9 +210,18 @@ modify, set/unset active) edits tables by hand, also on image files, and is in t
 
 8.2. The editor (in the installer, §9) MUST: show every disk and its partitions and free space;
 create, delete and resize partitions (a resize only into adjacent free space, and an oxfs
-partition only grown, with `growfs`-style help from `newfs_oxfs` if needed; other systems' file
-systems are never resized: the user makes room with their own tools first, decided §12); keep existing
-partitions untouched (dual boot); set types: oxfs, EFI system, BIOS boot, swap, other.
+partition only grown, by `growfs(8)`; other systems' file systems are never resized: the user
+makes room with their own tools first, decided §12); keep existing partitions untouched (dual
+boot); set types: oxfs, EFI system, BIOS boot, swap, other. Its edits are staged: each disk's
+table is a copy until the install writes it, after the last screen (decided §13). A blank disk
+asks for GPT (the default) or MBR. One install may span disks (`/` on one, `/home` on another);
+the disk with the EFI system partition boots, and gets the BIOS boot code.
+
+8.2.1. `growfs(8)` grows an unmounted, clean oxfs to fill its partition. The bitmap lies before
+the data and is sized by it, so past the room in its last block every used data block moves
+further in (only device positions change: all of oxfs's pointers are data block numbers), the
+highest first, then the new bitmap blocks are zeroed and the superblock written last. The move
+is not safe against a crash; `growfs` asks first unless given `-y`.
 
 8.3. Several oxfs partitions MAY be made for `/`, `/usr`, `/var`, `/home`; each is written to
 the new system's `/etc/fstab`. A swap partition MAY be made: recorded in `fstab` as `sw`, used
@@ -341,9 +350,11 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
      (`EFIRT.md`), the loader scan; test: an install beside an existing partition and ESP, which
      are checked untouched.
    - 9b, the screens (§9.2, §9.5, §9.7) over the engine, in two commits (decided §13): 9b1
-     every screen, the disk step with Beside, Whole and Shell; 9b2 the partition editor. Test
-     `install_screens`: every answer a key on the serial line, at 64 MB, the new system's files
-     checked, then booted on UEFI and BIOS.
+     every screen, the disk step with Beside, Whole and Shell; 9b2 the partition editor
+     (Manual), `growfs`, and installs over several disks. Tests `install_screens` and
+     `install_editor`: every answer a key on the serial line, at 64 MB, the new system's files
+     checked, then booted on UEFI and BIOS; the editor's over two disks, beside a "Windows"
+     partition left byte for byte as it was, an existing oxfs grown and kept as `/home`.
 
 Progress: step 1 done (2026-10-18): the registry, `kern.disks`/`kern.disk.<name>`, IDE on all
 four positions with per-channel DMA and LBA48, every virtio-blk unit; its test is part of
@@ -404,6 +415,10 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-24 (user), step 9b2: the editor's changes are staged and written after the last
+  screen; an existing oxfs may grow (a `growfs` for oxfs, written now); an install may span
+  several disks; a blank disk asks for GPT or MBR, GPT first.
 
 - 2026-10-24 (user), step 9b: every question first, then one confirmation, then an unattended
   install; 9b in two commits, the screens (9b1) before the partition editor (9b2); the network
