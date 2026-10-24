@@ -45,8 +45,16 @@ OpenBSD. Without it, local time is UTC.
 4.2. The `TZ` environment variable overrides it for a process, with POSIX syntax (`TZ=EST5EDT`) or
 a zone name (`TZ=Europe/Berlin`), which musl looks up under `/usr/share/zoneinfo`.
 
-4.3. The hardware clock keeps UTC, the BSDs' default. A hardware clock set to local time (another
-operating system's convention, FreeBSD's `/etc/wall_cmos_clock`) is not supported.
+4.3. The hardware clock keeps UTC, the BSDs' default, unless `/etc/wall_cmos_clock` exists
+(FreeBSD's file; added 2026-10-24, user, for dual booting with Windows, which keeps local time).
+Then `rc.d/adjkerntz` sets `machdep.wall_cmos_clock=1` before `adjkerntz -a` sets
+`kern.utc_offset` (which it now always writes, so its first setting tells the kernel the zone is
+known), and once both are known the kernel takes the offset in effect then off the time it read
+from the hardware clock: once a boot, at calibration or at once if the clock was calibrated
+already. A later offset (daylight saving time) never moves the system clock; the kernel never
+writes the hardware clock, so keeping it in local time across such a change is the other
+system's job. The installer asks (`INSTALLER.md` §9.2), suggesting local time when it finds
+Windows.
 
 4.4. No zone is chosen by default; a new system runs in UTC until `tzsetup` is run.
 

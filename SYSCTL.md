@@ -96,6 +96,7 @@ macro is `__NR_sysctl`, distinct from musl's existing `__NR__sysctl`.
 | `kern.maxfiles` | int | tunable | open-file limit; by default one per 32 KiB of RAM, at least 512 (2048 at 64 MB) |
 | `kern.maxfilesperproc` | int | read-write, tunable | a process's own limit, which `RLIMIT_NOFILE` can't exceed; by default 9/10 of `kern.maxfiles` |
 | `kern.utc_offset` | int | read-write | the local zone's offset from UTC in minutes east (OpenBSD's name and unit), within a day; set by `adjkerntz(8)`, read by msdosfs for FAT's local-time stamps (`TIMEZONE.md` §4.5) |
+| `machdep.wall_cmos_clock` | int | read-write | 1: the CMOS clock keeps local time; with `kern.utc_offset` known, the kernel corrects its clock once (`TIMEZONE.md` §4.3); set by `rc.d/adjkerntz` from `/etc/wall_cmos_clock` |
 | `kern.argmax` | int | read | `execve(2)` argument limit (2 MiB) |
 | `kern.ngroups` | int | read | supplementary group limit |
 | `kern.iov_max` | int | read | 1024 |
