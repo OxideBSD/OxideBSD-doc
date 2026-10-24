@@ -86,8 +86,8 @@ shapes, `efi(4)`):
 | `EFIIOC_GET_TABLE` | a configuration table's GUID and address (for `efitable(8)`, later) |
 
 5.2. **Writing is limited** (decided §11): by default `EFIIOC_VAR_SET` takes only the
-variables a boot manager edits: `Boot####`, `BootOrder`, `BootNext`, `Timeout` and `Driver####`
-under the EFI global GUID, and anything under OxideBSD's own vendor GUID. Others are refused with
+variables a boot manager edits: `Boot####`, `BootOrder`, `BootNext`, `Timeout`, `Driver####`,
+`DriverOrder` and `OsIndications` under the EFI global GUID, and anything under OxideBSD's own vendor GUID. Others are refused with
 `EPERM` unless the sysctl `machdep.efi.unsafe_writes` is 1. Some firmware has bricked machines on
 writes it didn't expect (Samsung laptops, 2013), and a determination beast with root could
 otherwise wipe the platform keys.
@@ -161,6 +161,15 @@ Step 2 done (2026-10-23): the variable calls, `/dev/efi` (`EFIIOC_VAR_GET`/`NEXT
 `efirt_syscall_smoke` runs `efivar` through listing, printing, writing, appending, deleting, a
 refused write and `unsafe_writes`. OxideBSD's vendor GUID is
 `916e441e-ead7-4301-9aaf-6e0ba5a85339`.
+Step 3 done (2026-10-23): `lib/libefivar` (GUIDs, device paths both as bytes and in the
+specification's text form, `EFI_LOAD_OPTION`, the `/dev/efi` calls), host-tested with hostile
+input; `efivar -d` and `--load-option`; `efibootmgr(8)` with FreeBSD's options and output (`-k`
+and `-e`, for FreeBSD's loader, refused). `-c` finds the loader's mount, its partition (by its
+node's device number, or a `/dev/gpt/<label>` mount by the GPT name: the label node is a device
+of its own) and its GPT entry, and builds `HD(...)/File(...)`. `OsIndications` joined the write
+allow-list for `-f`/`-F`. `efirt_syscall_smoke` gained a disk with an empty ESP and runs
+`efibootmgr` through making, listing, deactivating, `BootNext`, the timeout, `-f`/`-F`, reordering
+and deleting an entry: 34 checks.
 
 ## 11. Decisions
 
