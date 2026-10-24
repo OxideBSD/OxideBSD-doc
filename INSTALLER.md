@@ -351,6 +351,13 @@ image files; `install_boot` partitions the blank disk, makes and checks an oxfs,
 partition while another is open). The partition editor's screens are step 9's. Before step 9
 (2026-10-23, user): oxfs mounts any number of file systems at once (`RAM_FLOOR.md` §4.8), so the
 installer mounts the new root next to the mfsroot; `install_boot` mounts one.
+Step 9a done (2026-10-23): `installer -f` (§9.4) with the guided layout and explicit
+`PARTITIONS`; Limine's BIOS boot code moved from `mkimg` into libpart (`set_bios_bootcode`, the
+same images byte for byte) and onto the medium (`limine-bios-hdd.bin`). `install_disk` installs at
+64 MB, then boots the installed disk to its login prompt on UEFI and on BIOS, at 64 MB too. Found
+on the way: Limine started from a disk's ESP holds 3 MB more than from the medium, and the kernel
+reclaimed the loader's memory only before pid 1, after the root's mount had already run out at
+64 MB; it now reclaims it once the drivers have their DMA buffers, before the file systems load.
 
 ## 12. Open questions
 
