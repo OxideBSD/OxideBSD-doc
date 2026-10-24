@@ -241,18 +241,27 @@ with the in-tree ncurses through FFI (decided §13), on the console.
 9.2. Steps, in order, each allowing a step back:
 
 1. Keymap (applies at once) and host name.
-2. Disks: the partition editor (§8), then which partition mounts where.
+2. Disks: the disk, then Beside (offered when its largest free space holds the guided layout),
+   Whole, the partition editor (§8, step 9b2), or Shell (`gpart` by hand), then which partition
+   is for what: an oxfs one `/` or another mount point, an EFI system partition kept or
+   formatted, a swap one swap; other types are left alone.
 3. Sets: `base` required; `clang`, `tests` optional; their sizes against the target's space.
    The install medium is found by its volume label among the registered CD and USB devices,
    mounted `cd9660` read-only, and each set checked against `MANIFEST` and extracted as a
    stream (`zstd -d | tar -x`, the `RAM_FLOOR.md` set format) onto the new file systems.
-4. Network: per interface, DHCP or a static address, router and name server; written to the
-   new `rc.conf` and `resolv.conf`.
-5. Time zone (`tzsetup`'s data) and whether the clock is UTC.
+4. Network: per interface, DHCP or a static address, router and name server, tried on the
+   install medium there and then (`dhclient`, `ifconfig`, `route`; decided §13), so a mistake
+   shows before the reboot; written to the new `rc.conf` and `resolv.conf`.
+5. Time zone (`zone1970.tab`'s regions and zones, on the medium; the new system's `tzsetup`
+   makes the link) and whether the hardware clock keeps UTC or local time
+   (`/etc/wall_cmos_clock`, `TIMEZONE.md` §4.3), local suggested when Windows is found.
 6. Root's password; users (name, full name, password, `wheel` or not) through `pw`.
 7. Boot loader (§8.4), `fstab`, `rc.conf`; reboot, shell or back.
 
-9.3. Everything is written only after a final confirmation listing what will be erased.
+9.3. Everything is written only after a final confirmation listing what will be erased: every
+question is asked first, then one screen lists the disk's partitions and what happens to each
+(erased, formatted, kept, new), the sets, the settings and the users, its default button Back;
+the install then runs unattended under a progress bar (decided §13).
 
 9.4. Scriptable: `installer -f <file>` reads every answer from a file in FreeBSD's
 `installerconfig` format (decided §13), so the tests can install unattended. The file is a
@@ -331,7 +340,10 @@ Each step its own commit, the suite and the POSIX canary green, `ram_floor_boot`
    - 9c, dual boot (§9.6), before 9b (decided §13): UEFI runtime services and `efibootmgr`
      (`EFIRT.md`), the loader scan; test: an install beside an existing partition and ESP, which
      are checked untouched.
-   - 9b, the screens (§9.2, §9.5, §9.7) over the engine, the partition editor among them.
+   - 9b, the screens (§9.2, §9.5, §9.7) over the engine, in two commits (decided §13): 9b1
+     every screen, the disk step with Beside, Whole and Shell; 9b2 the partition editor. Test
+     `install_screens`: every answer a key on the serial line, at 64 MB, the new system's files
+     checked, then booted on UEFI and BIOS.
 
 Progress: step 1 done (2026-10-18): the registry, `kern.disks`/`kern.disk.<name>`, IDE on all
 four positions with per-channel DMA and LBA48, every virtio-blk unit; its test is part of
@@ -392,6 +404,12 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-24 (user), step 9b: every question first, then one confirmation, then an unattended
+  install; 9b in two commits, the screens (9b1) before the partition editor (9b2); the network
+  step tries its settings on the medium there and then; the keys are `dialog(1)`'s plus F1 for
+  help and F10 for a shell, from any dialog. The clock question gets real support: a CMOS clock
+  keeping local time (`TIMEZONE.md` §4.3), suggested when Windows is on the machine.
 
 - 2026-10-23 (user), step 9c: installing beside is said both ways -- `BESIDE`/`WHOLE` outright,
   and a disk alone (or `DEFAULT`) choosing by whether it has a table, so an answer file erases a
