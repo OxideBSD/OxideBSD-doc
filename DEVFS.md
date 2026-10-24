@@ -52,7 +52,8 @@ other driver.
 `unit << 8` for a whole disk, `unit << 8 | N` for its partition N: `ide<u>` (3, u << 8) and
 `ide<u>p<N>`/`ide<u>s<N>` (3, u << 8 | N), `scsi<u>` (8, u << 8), `virt<u>` (252, u << 8) and
 their partitions likewise, `sata<C>.<P>[.<M>]` (251, u << 8) with u its place, `C << 9 | P << 4 |
-M` (`M` 15 for a drive on the port itself), `gpt/<label>` (253, in the order found). Numbers are in musl's `makedev` encoding (`st_rdev`),
+M` (`M` 15 for a drive on the port itself), `gpt/<label>` (253, in the order found), `gptid/<guid>`
+(254, in the order found). Numbers are in musl's `makedev` encoding (`st_rdev`),
 whose minor has 20 bits.
 
 ## 4. devfs

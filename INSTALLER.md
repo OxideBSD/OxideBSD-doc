@@ -218,11 +218,20 @@ partitions untouched (dual boot); set types: oxfs, EFI system, BIOS boot, swap, 
 the new system's `/etc/fstab`. A swap partition MAY be made: recorded in `fstab` as `sw`, used
 once OxideBSD pages out (not yet).
 
-8.4. Boot: a disk with an EFI system partition already gets OxideBSD's kernel in its own
-directory (`/EFI/OxideBSD/`) and an entry added to that ESP's `limine.conf`, or a fresh Limine if
-there is none; no existing boot entry is removed. On BIOS, Limine's stage 2 goes into a BIOS boot
-partition (GPT) or the MBR gap, as `mkimg -b` does; an existing MBR boot code is replaced only
-after the user confirms.
+8.4. Boot: the EFI system partition, a new one or the one the disk has, gets Limine as
+`\EFI\OxideBSD\BOOTX64.EFI`, and the kernel and `fsconf` in a directory of this install's own,
+`\EFI\OxideBSD\<id>\` (`<id>` the first 8 hex digits of its root's GPT GUID), so two OxideBSDs
+can share one partition; the kernel takes the boot module whose path ends `/fsconf`. The menu is
+`/boot/limine/limine.conf` on that partition, which every Limine there reads (`\EFI\OxideBSD`'s,
+the removable fallback's and BIOS's, Limine's `CONFIG.md`): a new one, or the existing one with
+OxideBSD's entry added at its end; no entry is ever removed. The removable fallback
+`\EFI\BOOT\BOOTX64.EFI` is written only if no system has taken it. On BIOS, Limine's stage 1 always
+replaces the disk's boot code (decided §13), its stage 2 going into a BIOS boot partition of
+OxideBSD's own (GPT; another system's is left alone) or the MBR gap, as `mkimg -b` does.
+
+8.5. An installed system names its partitions in `fstab` and `fsconf` by GPT GUID,
+`/dev/gptid/<guid>` (FreeBSD's names, lower case), which no other disk shares: labels are only
+the first of their name (`/dev/gpt/rootfs` on two disks is the first one registered).
 
 ## 9. The installer
 
@@ -259,22 +268,31 @@ pw useradd alice -m -G wheel
 ```
 
 `PARTITIONS` is FreeBSD's syntax: a disk, a scheme, and `{ size type [mountpoint], ... }` with
-sizes in `K`/`M`/`G` or `auto` (the rest); types `oxfs`, `efi`, `bios`, `swap`. `DEFAULT` (or no
-`PARTITIONS`) is the guided layout (§9.5) on the first disk.
+sizes in `K`/`M`/`G` or `auto` (the rest); types `oxfs`, `efi`, `bios`, `swap`; this makes a new
+table, erasing the disk. `DEFAULT` (or no `PARTITIONS`) is the guided layout (§9.5) on the first
+disk, and `[disk] [BESIDE | WHOLE]` on the disk named: `WHOLE` erases it, `BESIDE` keeps its
+table and installs in its largest free space, and neither word means `WHOLE` on a disk with no
+partition table and `BESIDE` on one with, so a disk is erased only when an answer file says so
+(decided §13).
 
 9.5. **Guided layout** beside the editor (decided §13): on a whole disk, or in its largest free
 space, so installing next to another system is one choice. A blank disk gets GPT with a BIOS
 boot partition (512 KiB), an ESP (260 MiB, FreeBSD's size), and one oxfs `/` over the rest; a
 disk with other systems keeps them, reuses an existing ESP (OxideBSD's files in their own
-directories, §8.4), and makes only what's missing, in the free space chosen.
+directories, §8.4), and makes only what's missing, in the free space chosen: its own BIOS boot
+partition (512 KiB, GPT), an ESP if there is none, and `/`, at least 1 GiB.
 
 9.6. **Dual boot made easy** (decided §13): on UEFI, the installer adds an `OxideBSD` boot entry
 to the firmware's NVRAM (`efibootmgr(8)`, over UEFI runtime services the kernel calls,
 `EFIRT.md`, not yet written) pointing at `\EFI\OxideBSD\BOOTX64.EFI`, and never touches another
-system's files. OxideBSD's Limine menu lists the other systems it finds: every ESP is scanned for
-known loaders (Windows' `bootmgfw.efi`, GRUB, systemd-boot, another Limine), each added as a
-chainload entry; on BIOS, a chainload of each other system's active partition. The confirm screen
-(§9.3) lists the entries; none is ever removed.
+system's files. OxideBSD's Limine menu lists the other systems it finds (decided §13): every ESP
+of every disk is scanned, each `\EFI\<dir>` but `\EFI\BOOT` (a copy of another loader) and the
+new system's own giving at most one chainload entry -- Windows' `bootmgfw.efi`, shim before
+GRUB, systemd-boot, another Limine (a loader whose text names `limine.conf`), else the
+directory's first `.efi` -- naming its partition by GPT GUID (`guid(...)`); on BIOS, a chainload
+of each MBR disk's active partitions (by disk signature, `mbr_id`) and of each GPT disk's FreeBSD
+boot partitions. An entry the menu has already (its path, or its partition) isn't added again.
+The confirm screen (§9.3) lists the entries; none is ever removed.
 
 9.7. **Looks**: bsdinstall's and sysinst's boxed dialogs (a title, buttons such as `[ OK ]` and
 `[ Back ]`), in rust colours instead of blue (decided §13).
@@ -359,6 +377,14 @@ same images byte for byte) and onto the medium (`limine-bios-hdd.bin`). `install
 on the way: Limine started from a disk's ESP holds 3 MB more than from the medium, and the kernel
 reclaimed the loader's memory only before pid 1, after the root's mount had already run out at
 64 MB; it now reclaims it once the drivers have their DMA buffers, before the file systems load.
+Step 9c done (2026-10-23): `BESIDE`/`WHOLE` and the automatic choice (§9.4), the beside layout
+(§9.5), the ESP layout and shared `limine.conf` (§8.4), `/dev/gptid` names (§8.5), the loader
+scan and the firmware's boot entry (§9.6; `efibootmgr` crunched into the medium's `rescue`).
+`install_beside` installs at 64 MB beside a "Windows" ESP and a partition of random bytes, boots
+the installed disk on UEFI through its firmware entry and on BIOS, and checks the other partition
+byte for byte. Found on the way: under UEFI at 64 MB, OVMF keeps about 5 MB more when any disk is
+partitioned, and the medium's mfsroot no longer fitted beside the kernel's file, which Limine kept
+for nothing; our Limine fork now frees it when the kernel doesn't ask for it.
 
 ## 12. Open questions
 
@@ -366,6 +392,13 @@ None left. Answered 2026-10-18 (user): devices keep bus names (§5.1); the keyma
 `wsconsctl` (§7.2); resizing only into free space, never another system's file system (§8.2).
 
 ## 13. Decisions
+
+- 2026-10-23 (user), step 9c: installing beside is said both ways -- `BESIDE`/`WHOLE` outright,
+  and a disk alone (or `DEFAULT`) choosing by whether it has a table, so an answer file erases a
+  disk only when it says so; installed systems name partitions by `/dev/gptid/<guid>`, always;
+  on BIOS Limine's boot code always replaces the disk's (no confirmation), its menu chainloading
+  the others; the loader scan covers Windows, shim/GRUB, systemd-boot, other Limines and any
+  other `\EFI\<dir>`'s `.efi`.
 
 - 2026-10-23 (user): the screens use the "true rust" palette (cream dialogs, copper titles,
   burnt-orange selection on iron oxide), set through Linux's `ESC ] P` palette escape, which the
