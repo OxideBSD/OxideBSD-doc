@@ -72,8 +72,10 @@ a call may take milliseconds (a flash write).
 
 ## 5. The interface: `/dev/efi`
 
-5.1. A module, `efirt` (`sys/modules/efirt`), loaded only when the firmware is UEFI, registers
-the device `/dev/efi` (`make_dev`, mode 0600 root). Its ioctls (OxideBSD's numbers, FreeBSD's
+5.1. The kernel (`sys/efirt.rs`), when the firmware has runtime services, registers the device
+`/dev/efi` (`make_dev`, (7, 2), mode 0600 root), beside the calls, as `/dev/devctl` is beside
+its queue. (A module was planned; none makes a device yet, and one would have needed a kernel
+export per call as well as the copy routines.) Its ioctls (OxideBSD's numbers, FreeBSD's
 shapes, `efi(4)`):
 
 | Request | Does |
@@ -142,7 +144,7 @@ Each step its own commit, the suite and the POSIX canary green.
 1. The EFI system table and memory map snapshotted; the EFI page table built; `efirt::call` with
    the fault recovery; `GetTime` called once at boot and logged as the first proof; the
    `ResetSystem` fallback (§9).
-2. The `efirt` module and `/dev/efi`; `efivar(8)`; the OVMF VARS runner support; the smoke test.
+2. `/dev/efi`; `efivar(8)`; the OVMF VARS runner support; the smoke test.
 3. `lib/libefivar` and `efibootmgr(8)`.
 4. The installer's use of it (`INSTALLER.md` step 9c).
 
@@ -153,6 +155,12 @@ recovery point) and `fixup_fault`, which the page fault and exception handlers a
 `GetTime` logged at boot; `ResetSystem` after the keyboard controller's reset and ACPI's S5.
 `efirt_smoke` checks the clock and a caught fault. The reset fallback is untested: ACPI works
 under QEMU, so it never runs there.
+Step 2 done (2026-10-23): the variable calls, `/dev/efi` (`EFIIOC_VAR_GET`/`NEXT`/`SET`,
+`EFIIOC_GET_TIME`; `efi(4)`), the allow-list and `machdep.efi.*`; `efivar(8)`; the runner's
+`QEMU_UEFI_VARS` (OVMF's code and a variable store copy as two flash devices);
+`efirt_syscall_smoke` runs `efivar` through listing, printing, writing, appending, deleting, a
+refused write and `unsafe_writes`. OxideBSD's vendor GUID is
+`916e441e-ead7-4301-9aaf-6e0ba5a85339`.
 
 ## 11. Decisions
 
